@@ -99,22 +99,52 @@ php artisan queue:work
 ## 🔐 RBAC Design
 
 ### Role Hierarchy
-1. **Admin**: Full system access
-2. **Provider Admin**: Can manage other providers
-3. **Provider**: Can accept and complete requests
-4. **Customer**: Can create and manage own requests
+1. **Admin**: Full system access, can manage all users and permissions
+2. **Provider Admin**: Can manage permissions for other providers (employees)
+3. **Provider Employee**: Limited provider permissions, can accept/complete requests
+4. **Customer**: Can create and manage own requests only
 
-### Dynamic Permissions
+### Dynamic Permissions System
+The RBAC system is designed to be flexible and dynamic:
+
+#### **Permission Storage**
+- **Role-based permissions**: Stored in `role_has_permissions` table
+- **Direct user permissions**: Stored in `user_permissions` table (overrides roles)
+- **Permission categories**: Organized by feature area (request, user, admin, subscription)
+- **Permission scopes**: Define context-specific permissions
+
+#### **Core Permissions**
 - `request.create`: Create service requests
 - `request.accept`: Accept service requests
 - `request.complete`: Mark requests as completed
 - `request.view_all`: View all requests (admin only)
 - `user.manage`: Manage user permissions (admin only)
+- `permission.assign`: Assign permissions to users (admin/provider admin only)
+- `subscription.upgrade`: Upgrade subscription plans
 
-### Permission Enforcement
-- **Middleware**: `CheckPermission` middleware validates permissions
-- **Policies**: Model-based authorization policies
-- **API Level**: All endpoints enforce permission checks
+#### **Permission Enforcement Layers**
+1. **Middleware Layer**: `CheckPermission` middleware validates permissions before controller execution
+2. **Policy Layer**: Model-based authorization policies provide fine-grained access control
+3. **API Level**: All endpoints enforce permission checks with proper error responses
+4. **Database Level**: Row-level security through query scopes
+
+#### **Dynamic Permission Assignment**
+- **Admin**: Can assign any permission to any user
+- **Provider Admin**: Can assign provider-level permissions to other providers
+- **Audit Trail**: All permission changes are logged in `role_permissions_audit` table
+- **Temporary Permissions**: Support for time-limited permission grants
+
+#### **Permission Resolution Logic**
+1. Check direct user permissions first (highest priority)
+2. Fall back to role-based permissions
+3. Apply permission inheritance through role hierarchy
+4. Respect permission denial overrides
+
+#### **Security Features**
+- **Permission Escalation Prevention**: Users cannot grant themselves higher permissions
+- **Scope Validation**: Permissions are validated against user context
+- **Rate Limiting**: Permission checks are cached to prevent abuse
+- **Audit Logging**: All permission decisions are logged for security review
 
 ## 🎯 Key Design Decisions
 

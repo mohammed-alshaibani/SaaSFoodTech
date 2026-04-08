@@ -4,8 +4,9 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { useEcho } from '@/hooks/useEcho';
+import { Search, Filter, MapPin, Clock, DollarSign } from 'lucide-react';
 
-// ─── Status Badge ─────────────────────────────────────────────────────────────
+//    // Status Badge
 function StatusBadge({ status }) {
     const map = {
         pending: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
@@ -19,24 +20,23 @@ function StatusBadge({ status }) {
     );
 }
 
-// ─── Distance pill ────────────────────────────────────────────────────────────
+//    // Distance pill
 function DistancePill({ km }) {
     if (km == null) return null;
     return (
         <span className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
-            <span>📍</span>
+            <span>Location</span>
             <span>{km} km away</span>
         </span>
     );
 }
 
-// ─── Request Card ─────────────────────────────────────────────────────────────
+//    // Request Card
 function RequestCard({ req, userId, onAccept, onComplete, accepting, completing }) {
     const isMine = req.provider?.id === userId;
 
     return (
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-md transition-shadow p-5 flex flex-col gap-4">
-
             {/* Header */}
             <div className="flex justify-between items-start gap-2">
                 <h3 className="font-bold text-slate-900 dark:text-slate-100 leading-snug text-sm">{req.title}</h3>
@@ -51,9 +51,9 @@ function RequestCard({ req, userId, onAccept, onComplete, accepting, completing 
             {/* Meta */}
             <div className="flex flex-wrap gap-x-4 gap-y-1">
                 <DistancePill km={req.distance_km} />
-                <span className="text-xs text-slate-400">👤 {req.customer?.name ?? '—'}</span>
+                <span className="text-xs text-slate-400">Customer: {req.customer?.name ?? 'Unknown'}</span>
                 {req.provider?.name && (
-                    <span className="text-xs text-slate-400">🔧 {req.provider.name}</span>
+                    <span className="text-xs text-slate-400">Provider: {req.provider.name}</span>
                 )}
             </div>
 
@@ -61,24 +61,20 @@ function RequestCard({ req, userId, onAccept, onComplete, accepting, completing 
             <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex gap-2">
                 {req.status === 'pending' && (
                     <button
-                        id={`accept-btn-${req.id}`}
                         onClick={() => onAccept(req.id)}
                         disabled={accepting === req.id}
-                        className="flex-1 bg-indigo-600 hover:bg-indigo-700 active:scale-95 disabled:opacity-60
-                                   text-white py-2 rounded-xl text-xs font-semibold transition-all"
+                        className="flex-1 bg-indigo-600 hover:bg-indigo-700 active:scale-95 disabled:opacity-60 text-white py-2 rounded-xl text-xs font-semibold transition-all"
                     >
-                        {accepting === req.id ? 'Accepting…' : 'Accept Request'}
+                        {accepting === req.id ? 'Accepting...' : 'Accept Request'}
                     </button>
                 )}
                 {req.status === 'accepted' && isMine && (
                     <button
-                        id={`complete-btn-${req.id}`}
                         onClick={() => onComplete(req.id)}
                         disabled={completing === req.id}
-                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 disabled:opacity-60
-                                   text-white py-2 rounded-xl text-xs font-semibold transition-all"
+                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 disabled:opacity-60 text-white py-2 rounded-xl text-xs font-semibold transition-all"
                     >
-                        {completing === req.id ? 'Completing…' : 'Mark Completed'}
+                        {completing === req.id ? 'Completing...' : 'Mark Completed'}
                     </button>
                 )}
                 {req.status === 'accepted' && !isMine && (
@@ -87,35 +83,42 @@ function RequestCard({ req, userId, onAccept, onComplete, accepting, completing 
                     </span>
                 )}
                 {req.status === 'completed' && (
-                    <span className="flex-1 text-center text-xs text-emerald-600 font-semibold py-2">✓ Completed</span>
+                    <span className="flex-1 text-center text-xs text-emerald-600 font-semibold py-2">Completed</span>
                 )}
             </div>
         </div>
     );
 }
 
-// ─── Main Dashboard ───────────────────────────────────────────────────────────
+//    // Main Dashboard
 export default function ProviderDashboard() {
     const { user } = useAuth();
 
-    // ── State ─────────────────────────────────────────────────────────────────
-    const [tab, setTab] = useState('all');          // 'all' | 'nearby'
+    //    // State
+    const [tab, setTab] = useState('all');
     const [requests, setRequests] = useState([]);
+    const [filteredRequests, setFilteredRequests] = useState([]);
     const [loading, setLoading] = useState(true);
     const [radius, setRadius] = useState(20);
-    const [coords, setCoords] = useState(null);         // null = not yet fetched
+    const [coords, setCoords] = useState(null);
     const [geoError, setGeoError] = useState('');
     const [accepting, setAccepting] = useState(null);
     const [completing, setCompleting] = useState(null);
     const [toast, setToast] = useState(null);
     const pendingLiveUpdate = useRef(false);
 
+    // Enhanced filtering
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [sortBy, setSortBy] = useState('newest');
+    const [showFilters, setShowFilters] = useState(false);
+
     const showToast = useCallback((msg, type = 'info') => {
         setToast({ msg, type });
         setTimeout(() => setToast(null), 3500);
     }, []);
 
-    // ── Geolocation ───────────────────────────────────────────────────────────
+    //    // Geolocation
     const requestGeo = useCallback(() => {
         if (!navigator.geolocation) {
             setGeoError('Geolocation is not supported by your browser.');
@@ -127,16 +130,15 @@ export default function ProviderDashboard() {
                 setGeoError('');
             },
             () => {
-                // Fallback: Riyadh / Saudi Arabia centre
                 setCoords({ lat: 24.7136, lng: 46.6753 });
-                setGeoError('Could not get live location — using Riyadh as default.');
+                setGeoError('Using default location (Riyadh).');
             }
         );
     }, []);
 
     useEffect(() => { requestGeo(); }, [requestGeo]);
 
-    // ── Fetch ─────────────────────────────────────────────────────────────────
+    //    // Fetch
     const fetchRequests = useCallback(async (silent = false) => {
         if (!silent) setLoading(true);
         try {
@@ -158,7 +160,44 @@ export default function ProviderDashboard() {
 
     useEffect(() => { fetchRequests(); }, [fetchRequests]);
 
-    // ── Real-time updates via Reverb ──────────────────────────────────────────
+    // Filtering and sorting logic
+    useEffect(() => {
+        let filtered = [...requests];
+
+        // Search filter
+        if (searchTerm) {
+            filtered = filtered.filter(req => 
+                req.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                req.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                req.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+        }
+
+        // Status filter
+        if (statusFilter !== 'all') {
+            filtered = filtered.filter(req => req.status === statusFilter);
+        }
+
+        // Sorting
+        filtered.sort((a, b) => {
+            switch (sortBy) {
+                case 'newest':
+                    return new Date(b.created_at) - new Date(a.created_at);
+                case 'oldest':
+                    return new Date(a.created_at) - new Date(b.created_at);
+                case 'nearest':
+                    return (a.distance_km || Infinity) - (b.distance_km || Infinity);
+                case 'farthest':
+                    return (b.distance_km || 0) - (a.distance_km || 0);
+                default:
+                    return 0;
+            }
+        });
+
+        setFilteredRequests(filtered);
+    }, [requests, searchTerm, statusFilter, sortBy]);
+
+    //    // Real-time updates via Reverb
     useEcho(
         user ? `user.${user.id}` : null,
         'ServiceRequestUpdated',
@@ -166,11 +205,9 @@ export default function ProviderDashboard() {
             const updated = data.request;
             if (!updated) return;
 
-            // In-place update so we don't lose scroll position
             setRequests(prev => {
                 const idx = prev.findIndex(r => r.id === updated.id);
                 if (idx === -1) {
-                    // New request arrived — prepend for 'all' tab
                     if (tab === 'all') return [updated, ...prev];
                     return prev;
                 }
@@ -179,13 +216,13 @@ export default function ProviderDashboard() {
                 return next;
             });
 
-            const actionLabels = { accepted: '✓ Accepted', completed: '✓ Completed', created: '🆕 New request' };
+            const actionLabels = { accepted: 'Accepted', completed: 'Completed', created: 'New request' };
             showToast(`${actionLabels[data.action] ?? 'Updated'}: "${updated.title}"`, 'info');
         }, [tab, showToast]),
         [user?.id, tab]
     );
 
-    // ── Actions ───────────────────────────────────────────────────────────────
+    //    // Actions
     const handleAccept = useCallback(async (id) => {
         setAccepting(id);
         try {
@@ -213,7 +250,7 @@ export default function ProviderDashboard() {
         }
     }, [fetchRequests, showToast]);
 
-    // ── Toast styles ─────────────────────────────────────────────────────────
+    //    // Toast styles
     const toastClass = {
         info: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800',
         success: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800',
@@ -221,10 +258,9 @@ export default function ProviderDashboard() {
         warning: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800',
     };
 
-    // ── Render ────────────────────────────────────────────────────────────────
+    //    // Render
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-6 md:p-10">
-
             {/* Page header */}
             <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
                 <div>
@@ -236,11 +272,10 @@ export default function ProviderDashboard() {
                     </p>
                 </div>
                 <button
-                    id="provider-refresh-btn"
                     onClick={() => fetchRequests()}
                     className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 transition font-medium"
                 >
-                    ↻ Refresh
+                    Refresh
                 </button>
             </div>
 
@@ -251,12 +286,89 @@ export default function ProviderDashboard() {
                 </div>
             )}
 
+            {/* Enhanced Search and Filters */}
+            <div className="mb-6 flex flex-col lg:flex-row gap-4">
+                {/* Search Bar */}
+                <div className="flex-1 relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <input
+                        type="text"
+                        placeholder="Search requests, customers..."
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                </div>
+
+                {/* Filter Toggle */}
+                <button
+                    onClick={() => setShowFilters(!showFilters)}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+                >
+                    <Filter className="h-4 w-4" />
+                    Filters
+                    {(statusFilter !== 'all' || sortBy !== 'newest') && (
+                        <span className="w-2 h-2 bg-indigo-600 rounded-full"></span>
+                    )}
+                </button>
+            </div>
+
+            {/* Expanded Filters */}
+            {showFilters && (
+                <div className="mb-6 p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* Status Filter */}
+                        <div>
+                            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-2">Status</label>
+                            <select
+                                value={statusFilter}
+                                onChange={e => setStatusFilter(e.target.value)}
+                                className="w-full text-sm border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            >
+                                <option value="all">All Status</option>
+                                <option value="pending">Pending</option>
+                                <option value="accepted">Accepted</option>
+                                <option value="completed">Completed</option>
+                            </select>
+                        </div>
+
+                        {/* Sort By */}
+                        <div>
+                            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-2">Sort By</label>
+                            <select
+                                value={sortBy}
+                                onChange={e => setSortBy(e.target.value)}
+                                className="w-full text-sm border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            >
+                                <option value="newest">Newest First</option>
+                                <option value="oldest">Oldest First</option>
+                                <option value="nearest">Nearest First</option>
+                                <option value="farthest">Farthest First</option>
+                            </select>
+                        </div>
+
+                        {/* Clear Filters */}
+                        <div className="flex items-end">
+                            <button
+                                onClick={() => {
+                                    setSearchTerm('');
+                                    setStatusFilter('all');
+                                    setSortBy('newest');
+                                }}
+                                className="w-full text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 font-medium"
+                            >
+                                Clear Filters
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Tabs */}
             <div className="flex gap-1 p-1 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 mb-6 w-fit">
-                {[{ id: 'all', label: '📋 All Requests' }, { id: 'nearby', label: '📍 Nearby Orders' }].map(t => (
+                {[{ id: 'all', label: 'All Requests' }, { id: 'nearby', label: 'Nearby Orders' }].map(t => (
                     <button
                         key={t.id}
-                        id={`tab-${t.id}`}
                         onClick={() => setTab(t.id)}
                         className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${tab === t.id
                                 ? 'bg-indigo-600 text-white shadow-sm'
@@ -274,7 +386,6 @@ export default function ProviderDashboard() {
                     <div className="flex items-center gap-3">
                         <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Radius:</span>
                         <select
-                            id="nearby-radius"
                             value={radius}
                             onChange={e => setRadius(Number(e.target.value))}
                             className="text-sm border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -285,11 +396,10 @@ export default function ProviderDashboard() {
                         </select>
                     </div>
                     <button
-                        id="nearby-update-location-btn"
                         onClick={requestGeo}
                         className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
                     >
-                        🎯 Update my location
+                        Update my location
                     </button>
                     {coords && (
                         <span className="text-xs text-slate-400">
@@ -298,7 +408,7 @@ export default function ProviderDashboard() {
                     )}
                     {geoError && (
                         <span className={`text-xs ${geoError.includes('default') ? 'text-amber-600' : 'text-red-500'}`}>
-                            ⚠ {geoError}
+                            {geoError}
                         </span>
                     )}
                 </div>
@@ -309,18 +419,20 @@ export default function ProviderDashboard() {
                 <div className="flex items-center justify-center py-24 text-slate-400">
                     <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-500 border-t-transparent" />
                 </div>
-            ) : requests.length === 0 ? (
+            ) : filteredRequests.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-24 text-slate-400 gap-3">
-                    <span className="text-5xl">{tab === 'nearby' ? '📭' : '🗂️'}</span>
+                    <span className="text-5xl">{tab === 'nearby' ? 'Location' : 'Folder'}</span>
                     <p className="text-sm">
                         {tab === 'nearby'
                             ? `No pending requests within ${radius} km of your location.`
-                            : 'No requests found.'}
+                            : searchTerm || statusFilter !== 'all'
+                                ? 'No requests match your filters.'
+                                : 'No requests found.'}
                     </p>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                    {requests.map(req => (
+                    {filteredRequests.map(req => (
                         <RequestCard
                             key={req.id}
                             req={req}
@@ -335,10 +447,12 @@ export default function ProviderDashboard() {
             )}
 
             {/* Footer */}
-            {!loading && requests.length > 0 && (
+            {!loading && filteredRequests.length > 0 && (
                 <p className="mt-6 text-xs text-slate-400 text-end">
-                    {requests.length} request{requests.length !== 1 ? 's' : ''} shown
+                    {filteredRequests.length} request{filteredRequests.length !== 1 ? 's' : ''} shown
                     {tab === 'nearby' && coords && ` within ${radius} km`}
+                    {searchTerm && ` (filtered by "${searchTerm}")`}
+                    {statusFilter !== 'all' && ` (${statusFilter})`}
                 </p>
             )}
         </div>

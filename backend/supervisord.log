@@ -17,3 +17,47 @@
 2026-04-08 08:09:00,627 INFO gave up: laravel-worker_00 entered FATAL state, too many start retries too quickly
 2026-04-08 08:09:00,627 INFO spawnerr: unknown error making dispatchers for 'laravel-worker_01': EACCES
 2026-04-08 08:09:00,627 INFO gave up: laravel-worker_01 entered FATAL state, too many start retries too quickly
+2026-04-08 19:44:33,230 INFO Set uid to user 1000 succeeded
+2026-04-08 19:44:33,316 INFO supervisord started with pid 1
+2026-04-08 19:44:34,336 INFO spawned: 'php-fpm' with pid 7
+2026-04-08 19:44:34,366 INFO spawnerr: unknown error making dispatchers for 'cron': EACCES
+2026-04-08 19:44:34,373 INFO spawnerr: unknown error making dispatchers for 'laravel-worker_00': EACCES
+2026-04-08 19:44:34,391 INFO spawnerr: unknown error making dispatchers for 'laravel-worker_01': EACCES
+2026-04-08 19:44:35,395 INFO success: php-fpm entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+2026-04-08 19:44:35,402 INFO spawnerr: unknown error making dispatchers for 'cron': EACCES
+2026-04-08 19:44:35,411 INFO spawnerr: unknown error making dispatchers for 'laravel-worker_00': EACCES
+2026-04-08 19:44:35,423 INFO spawnerr: unknown error making dispatchers for 'laravel-worker_01': EACCES
+2026-04-08 19:44:37,594 INFO spawnerr: unknown error making dispatchers for 'cron': EACCES
+2026-04-08 19:44:37,596 INFO spawnerr: unknown error making dispatchers for 'laravel-worker_00': EACCES
+2026-04-08 19:44:37,597 INFO spawnerr: unknown error making dispatchers for 'laravel-worker_01': EACCES
+2026-04-08 19:44:40,609 INFO spawnerr: unknown error making dispatchers for 'cron': EACCES
+2026-04-08 19:44:40,627 INFO gave up: cron entered FATAL state, too many start retries too quickly
+2026-04-08 19:44:40,635 INFO spawnerr: unknown error making dispatchers for 'laravel-worker_00': EACCES
+2026-04-08 19:44:40,645 INFO gave up: laravel-worker_00 entered FATAL state, too many start retries too quickly
+2026-04-08 19:44:40,659 INFO spawnerr: unknown error making dispatchers for 'laravel-worker_01': EACCES
+2026-04-08 19:44:40,663 INFO gave up: laravel-worker_01 entered FATAL state, too many start retries too quickly
+2026-04-08 20:17:04,400 INFO reaped unknown pid 524 (exit status 0)
+2026-04-08 20:22:23,996 WARN received SIGQUIT indicating exit request
+2026-04-08 20:22:24,000 INFO waiting for php-fpm to die
+2026-04-08 20:22:54,476 INFO Set uid to user 1000 succeeded
+2026-04-08 20:22:54,520 INFO supervisord started with pid 1
+2026-04-08 20:22:55,546 INFO spawned: 'php-fpm' with pid 7
+2026-04-08 20:22:55,578 INFO spawnerr: unknown error making dispatchers for 'cron': EACCES
+2026-04-08 20:22:55,600 INFO spawnerr: unknown error making dispatchers for 'laravel-worker_00': EACCES
+2026-04-08 20:22:55,623 INFO spawnerr: unknown error making dispatchers for 'laravel-worker_01': EACCES
+2026-04-08 20:22:57,262 INFO success: php-fpm entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+2026-04-08 20:22:57,271 INFO spawnerr: unknown error making dispatchers for 'cron': EACCES
+2026-04-08 20:22:57,280 INFO spawnerr: unknown error making dispatchers for 'laravel-worker_00': EACCES
+2026-04-08 20:22:57,303 INFO spawnerr: unknown error making dispatchers for 'laravel-worker_01': EACCES
+2026-04-08 20:22:59,321 INFO spawnerr: unknown error making dispatchers for 'cron': EACCES
+2026-04-08 20:22:59,324 INFO spawnerr: unknown error making dispatchers for 'laravel-worker_00': EACCES
+2026-04-08 20:22:59,327 INFO spawnerr: unknown error making dispatchers for 'laravel-worker_01': EACCES
+2026-04-08 20:23:02,337 INFO spawnerr: unknown error making dispatchers for 'cron': EACCES
+2026-04-08 20:23:02,383 INFO gave up: cron entered FATAL state, too many start retries too quickly
+2026-04-08 20:23:02,429 INFO spawnerr: unknown error making dispatchers for 'laravel-worker_00': EACCES
+2026-04-08 20:23:02,461 INFO gave up: laravel-worker_00 entered FATAL state, too many start retries too quickly
+2026-04-08 20:23:02,474 INFO spawnerr: unknown error making dispatchers for 'laravel-worker_01': EACCES
+2026-04-08 20:23:02,483 INFO gave up: laravel-worker_01 entered FATAL state, too many start retries too quickly
+2026-04-08 20:35:07,384 INFO reaped unknown pid 28 (exit status 0)
+2026-04-08 20:56:32,026 WARN received SIGQUIT indicating exit request
+2026-04-08 20:56:32,044 INFO waiting for php-fpm to die

@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
+import { useEcho } from '@/hooks/useEcho';
+import { Search, Filter, Plus, MapPin, Clock, Star, TrendingUp } from 'lucide-react';
 
 // ─── Upgrade Banner ─────────────────────────────────────────────────────────
 function UpgradeBanner({ requestCount, freeLimit }) {
@@ -39,6 +41,7 @@ export default function CustomerDashboard() {
     const { user, refreshUser } = useAuth();
 
     const [requests, setRequests] = useState([]);
+    const [filteredRequests, setFilteredRequests] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [formData, setFormData] = useState({
@@ -50,6 +53,13 @@ export default function CustomerDashboard() {
     const [message, setMessage] = useState({ text: '', type: 'info' });
     const [enhancing, setEnhancing] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+
+    // Enhanced filtering
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [sortBy, setSortBy] = useState('newest');
+    const [showFilters, setShowFilters] = useState(false);
+    const [stats, setStats] = useState({ total: 0, pending: 0, accepted: 0, completed: 0 });
 
     // subscription gate data comes from /me (via AuthContext user object)
     const limitReached = user?.limit_reached ?? false;
@@ -72,6 +82,78 @@ export default function CustomerDashboard() {
     useEffect(() => {
         fetchRequests();
     }, [fetchRequests]);
+
+    // Filtering and sorting logic
+    useEffect(() => {
+        let filtered = [...requests];
+
+        // Search filter
+        if (searchTerm) {
+            filtered = filtered.filter(req => 
+                req.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                req.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                req.provider?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+        }
+
+        // Status filter
+        if (statusFilter !== 'all') {
+            filtered = filtered.filter(req => req.status === statusFilter);
+        }
+
+        // Sorting
+        filtered.sort((a, b) => {
+            switch (sortBy) {
+                case 'newest':
+                    return new Date(b.created_at) - new Date(a.created_at);
+                case 'oldest':
+                    return new Date(a.created_at) - new Date(b.created_at);
+                case 'title':
+                    return a.title.localeCompare(b.title);
+                default:
+                    return 0;
+            }
+        });
+
+        setFilteredRequests(filtered);
+
+        // Update stats
+        const newStats = {
+            total: requests.length,
+            pending: requests.filter(r => r.status === 'pending').length,
+            accepted: requests.filter(r => r.status === 'accepted').length,
+            completed: requests.filter(r => r.status === 'completed').length,
+        };
+        setStats(newStats);
+    }, [requests, searchTerm, statusFilter, sortBy]);
+
+    // Real-time updates via Reverb
+    useEcho(
+        user ? `user.${user.id}` : null,
+        'ServiceRequestUpdated',
+        useCallback((data) => {
+            const updated = data.request;
+            if (!updated) return;
+
+            setRequests(prev => {
+                const idx = prev.findIndex(r => r.id === updated.id);
+                if (idx === -1) {
+                    return [updated, ...prev];
+                }
+                const next = [...prev];
+                next[idx] = { ...next[idx], ...updated };
+                return next;
+            });
+
+            const actionLabels = { accepted: 'Accepted', completed: 'Completed', created: 'New request' };
+            setMessage({
+                text: `${actionLabels[data.action] ?? 'Updated'}: "${updated.title}"`,
+                type: data.action === 'completed' ? 'success' : 'info'
+            });
+            setTimeout(() => setMessage({ text: '', type: 'info' }), 3000);
+        }, []),
+        [user?.id]
+    );
 
     // ── AI Enhance ────────────────────────────────────────────
     const handleEnhance = async () => {
@@ -127,28 +209,71 @@ export default function CustomerDashboard() {
 
     // ── Render ────────────────────────────────────────────────
     return (
-        <div className="space-y-6">
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-6 md:p-10">
 
-            {/* Header */}
-            <div className="flex justify-between items-center">
+            {/* Page header */}
+            <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
                 <div>
-                    <h2 className="text-2xl font-semibold">My Service Requests</h2>
-                    {user?.plan === 'free' && (
-                        <p className="text-sm text-gray-400 mt-0.5">
-                            {requestCount} / {freeLimit} requests used (Free Plan)
-                        </p>
-                    )}
+                    <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+                        Customer Dashboard
+                    </h1>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                        Manage your service requests and track their progress.
+                    </p>
                 </div>
                 <button
                     onClick={() => setShowForm(v => !v)}
                     disabled={limitReached}
-                    className={`px-4 py-2 rounded-md text-white transition text-sm font-medium
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition
                         ${limitReached
-                            ? 'bg-gray-300 cursor-not-allowed'
-                            : 'bg-blue-600 hover:bg-blue-700'}`}
+                            ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                            : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}
                 >
-                    {showForm ? 'Cancel' : '+ New Request'}
+                    <Plus className="h-4 w-4" />
+                    {showForm ? 'Cancel' : 'New Request'}
                 </button>
+            </div>
+
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 p-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Total Requests</p>
+                            <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{stats.total}</p>
+                        </div>
+                        <TrendingUp className="h-8 w-8 text-indigo-500" />
+                    </div>
+                </div>
+                <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 p-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Pending</p>
+                            <p className="text-2xl font-bold text-amber-600">{stats.pending}</p>
+                        </div>
+                        <Clock className="h-8 w-8 text-amber-500" />
+                    </div>
+                </div>
+                <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 p-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">In Progress</p>
+                            <p className="text-2xl font-bold text-blue-600">{stats.accepted}</p>
+                        </div>
+                        <Star className="h-8 w-8 text-blue-500" />
+                    </div>
+                </div>
+                <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 p-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Completed</p>
+                            <p className="text-2xl font-bold text-emerald-600">{stats.completed}</p>
+                        </div>
+                        <div className="h-8 w-8 bg-emerald-100 rounded-full flex items-center justify-center">
+                            <span className="text-emerald-600 font-bold">C</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* Upgrade banner */}
@@ -158,8 +283,85 @@ export default function CustomerDashboard() {
 
             {/* Toast message */}
             {message.text && (
-                <div className={`p-3 border rounded-md text-sm ${msgStyles[message.type]}`}>
+                <div className={`fixed top-5 end-5 z-50 px-4 py-3 rounded-xl border shadow-lg text-sm font-medium transition-all ${msgStyles[message.type]}`}>
                     {message.text}
+                </div>
+            )}
+
+            {/* Enhanced Search and Filters */}
+            <div className="mb-6 flex flex-col lg:flex-row gap-4">
+                {/* Search Bar */}
+                <div className="flex-1 relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <input
+                        type="text"
+                        placeholder="Search your requests..."
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                </div>
+
+                {/* Filter Toggle */}
+                <button
+                    onClick={() => setShowFilters(!showFilters)}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+                >
+                    <Filter className="h-4 w-4" />
+                    Filters
+                    {(statusFilter !== 'all' || sortBy !== 'newest') && (
+                        <span className="w-2 h-2 bg-indigo-600 rounded-full"></span>
+                    )}
+                </button>
+            </div>
+
+            {/* Expanded Filters */}
+            {showFilters && (
+                <div className="mb-6 p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* Status Filter */}
+                        <div>
+                            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-2">Status</label>
+                            <select
+                                value={statusFilter}
+                                onChange={e => setStatusFilter(e.target.value)}
+                                className="w-full text-sm border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            >
+                                <option value="all">All Status</option>
+                                <option value="pending">Pending</option>
+                                <option value="accepted">In Progress</option>
+                                <option value="completed">Completed</option>
+                            </select>
+                        </div>
+
+                        {/* Sort By */}
+                        <div>
+                            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-2">Sort By</label>
+                            <select
+                                value={sortBy}
+                                onChange={e => setSortBy(e.target.value)}
+                                className="w-full text-sm border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            >
+                                <option value="newest">Newest First</option>
+                                <option value="oldest">Oldest First</option>
+                                <option value="title">Title A-Z</option>
+                            </select>
+                        </div>
+
+                        {/* Clear Filters */}
+                        <div className="flex items-end">
+                            <button
+                                onClick={() => {
+                                    setSearchTerm('');
+                                    setStatusFilter('all');
+                                    setSortBy('newest');
+                                }}
+                                className="w-full text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 font-medium"
+                            >
+                                Clear Filters
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -236,34 +438,63 @@ export default function CustomerDashboard() {
                 </div>
             )}
 
-            {/* Requests table */}
-            <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead className="bg-gray-50">
-                        <tr>
-                            {['Title', 'Status', 'Provider', 'Date'].map(h => (
-                                <th key={h} className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                        {loading ? (
-                            <tr><td colSpan={4} className="px-6 py-8 text-center text-gray-400">Loading...</td></tr>
-                        ) : requests.length === 0 ? (
-                            <tr><td colSpan={4} className="px-6 py-8 text-center text-gray-400">No requests yet. Create your first one!</td></tr>
-                        ) : (
-                            requests.map(req => (
-                                <tr key={req.id} className="hover:bg-gray-50 transition">
-                                    <td className="px-6 py-4 font-medium text-gray-900">{req.title}</td>
-                                    <td className="px-6 py-4"><StatusBadge status={req.status} /></td>
-                                    <td className="px-6 py-4 text-gray-500">{req.provider?.name ?? <span className="italic text-gray-300">Searching...</span>}</td>
-                                    <td className="px-6 py-4 text-gray-500">{new Date(req.created_at).toLocaleDateString()}</td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
+            {/* Requests List */}
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden">
+                {loading ? (
+                    <div className="flex items-center justify-center py-24 text-slate-400">
+                        <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-500 border-t-transparent" />
+                    </div>
+                ) : filteredRequests.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-24 text-slate-400 gap-3">
+                        <span className="text-5xl">Folder</span>
+                        <p className="text-sm">
+                            {searchTerm || statusFilter !== 'all'
+                                ? 'No requests match your filters.'
+                                : 'No requests yet. Create your first one!'}
+                        </p>
+                    </div>
+                ) : (
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {filteredRequests.map(req => (
+                            <div key={req.id} className="p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
+                                <div className="flex items-start justify-between gap-4">
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-2">{req.title}</h3>
+                                        <p className="text-sm text-slate-600 dark:text-slate-400 mb-3 line-clamp-2">{req.description}</p>
+                                        <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
+                                            <span className="flex items-center gap-1">
+                                                <Clock className="h-3 w-3" />
+                                                {new Date(req.created_at).toLocaleDateString()}
+                                            </span>
+                                            <span className="flex items-center gap-1">
+                                                <MapPin className="h-3 w-3" />
+                                                {req.latitude?.toFixed(2)}, {req.longitude?.toFixed(2)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col items-end gap-2">
+                                        <StatusBadge status={req.status} />
+                                        {req.provider?.name && (
+                                            <div className="text-xs text-slate-500 dark:text-slate-400">
+                                                Provider: {req.provider.name}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
+
+            {/* Footer */}
+            {!loading && filteredRequests.length > 0 && (
+                <p className="mt-6 text-xs text-slate-400 text-end">
+                    {filteredRequests.length} request{filteredRequests.length !== 1 ? 's' : ''} shown
+                    {searchTerm && ` (filtered by "${searchTerm}")`}
+                    {statusFilter !== 'all' && ` (${statusFilter})`}
+                </p>
+            )}
         </div>
     );
 }

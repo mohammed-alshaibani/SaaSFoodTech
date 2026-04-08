@@ -57,12 +57,20 @@ export default function Navbar() {
                 <div className="hidden md:flex items-center gap-4">
                     <LanguageToggle />
                     {user ? (
-                        <Link
-                            href="/admin" // or use dashboard path helper
-                            className="px-5 py-2.5 rounded-full bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-all active:scale-[0.98] shadow-md shadow-blue-600/10"
-                        >
-                            {t('common.dashboard') || 'Dashboard'}
-                        </Link>
+                        <>
+                            <Link
+                                href="/subscription"
+                                className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors"
+                            >
+                                {t('common.subscription') || 'Subscription'}
+                            </Link>
+                            <Link
+                                href="/admin" // or use dashboard path helper
+                                className="px-5 py-2.5 rounded-full bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-all active:scale-[0.98] shadow-md shadow-blue-600/10"
+                            >
+                                {t('common.dashboard') || 'Dashboard'}
+                            </Link>
+                        </>
                     ) : (
                         <>
                             <Link
@@ -106,6 +114,11 @@ export default function Navbar() {
                         ))}
                         <hr className="w-full border-gray-100" />
                         <LanguageToggle />
+                        {user && (
+                            <Link href="/subscription" className="text-gray-600 font-medium">
+                                {t('common.subscription') || 'Subscription'}
+                            </Link>
+                        )}
                         <Link href="/login" className="text-gray-600 font-medium">{t('auth.login')}</Link>
                         <Link
                             href="/register"

@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/context/AuthenticationContext';
+import { useAuthorization } from '@/context/AuthorizationContext';
 import { useI18n } from '@/context/I18nContext';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
@@ -13,6 +14,7 @@ export default function LoginForm() {
   });
   const [errors, setErrors] = useState({});
   const { login } = useAuth();
+  const { getDashboardPath } = useAuthorization();
   const { t, isRTL } = useI18n();
   const router = useRouter();
 
@@ -50,27 +52,14 @@ export default function LoginForm() {
     if (!validateForm()) return;
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || t('auth.loginError'));
+      const result = await login(formData);
+      
+      if (result.success) {
+        const dashboardPath = getDashboardPath();
+        router.push(dashboardPath);
+      } else {
+        setErrors({ general: result.error });
       }
-
-      // Backend returns access_token, not token
-      const { access_token, user } = data;
-      const { dashboardPath } = await login(access_token, user);
-
-      // Redirect based on role returned from login() helper
-      router.push(dashboardPath);
     } catch (error) {
       setErrors({ general: error.message });
     }
