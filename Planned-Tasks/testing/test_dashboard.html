@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Otex API Testing Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 10px; margin-bottom: 30px; }
+        .card { background: white; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .status { display: inline-block; padding: 5px 15px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.pending { background: #fff3cd; color: #856404; }
+        .btn { background: #667eea; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; }
+        .btn:hover { background: #5a6fd8; }
+        .btn.secondary { background: #6c757d; }
+        .btn.danger { background: #dc3545; }
+        .input-group { margin: 10px 0; }
+        .input-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .input-group input, .input-group textarea, .input-group select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+        .response { background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 5px; padding: 15px; margin-top: 10px; font-family: monospace; white-space: pre-wrap; max-height: 300px; overflow-y: auto; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .metric { text-align: center; padding: 20px; background: white; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .metric-value { font-size: 2em; font-weight: bold; color: #667eea; }
+        .metric-label { color: #666; margin-top: 5px; }
+        .tabs { display: flex; border-bottom: 1px solid #ddd; margin-bottom: 20px; }
+        .tab { padding: 10px 20px; cursor: pointer; border-bottom: 2px solid transparent; }
+        .tab.active { border-bottom-color: #667eea; color: #667eea; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Otex API Testing Dashboard</h1>
+            <p>Interactive testing for your Laravel backend API</p>
+            <div id="connection-status" class="status pending">Checking connection...</div>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showTab('quick-test')">Quick Test</div>
+            <div class="tab" onclick="showTab('auth')">Authentication</div>
+            <div class="tab" onclick="showTab('requests')">Service Requests</div>
+            <div class="tab" onclick="showTab('monitoring')">Monitoring</div>
+        </div>
+
+        <!-- Quick Test Tab -->
+        <div id="quick-test" class="tab-content active">
+            <div class="card">
+                <h3>Quick API Health Check</h3>
+                <p>Test basic API connectivity and health status</p>
+                <button class="btn" onclick="testHealth()">Test Health Endpoint</button>
+                <button class="btn secondary" onclick="testDashboard()">Test Dashboard</button>
+                <div id="quick-response" class="response"></div>
+            </div>
+        </div>
+
+        <!-- Authentication Tab -->
+        <div id="auth" class="tab-content">
+            <div class="card">
+                <h3>User Registration</h3>
+                <div class="input-group">
+                    <label>Name</label>
+                    <input type="text" id="reg-name" value="Test User">
+                </div>
+                <div class="input-group">
+                    <label>Email</label>
+                    <input type="email" id="reg-email" value="test@example.com">
+                </div>
+                <div class="input-group">
+                    <label>Password</label>
+                    <input type="password" id="reg-password" value="Password123!">
+                </div>
+                <div class="input-group">
+                    <label>Role</label>
+                    <select id="reg-role">
+                        <option value="customer">Customer</option>
+                        <option value="provider">Provider</option>
+                    </select>
+                </div>
+                <button class="btn" onclick="registerUser()">Register User</button>
+                <div id="register-response" class="response"></div>
+            </div>
+
+            <div class="card">
+                <h3>User Login</h3>
+                <div class="input-group">
+                    <label>Email</label>
+                    <input type="email" id="login-email" value="test@example.com">
+                </div>
+                <div class="input-group">
+                    <label>Password</label>
+                    <input type="password" id="login-password" value="Password123!">
+                </div>
+                <button class="btn" onclick="loginUser()">Login</button>
+                <div id="login-response" class="response"></div>
+            </div>
+
+            <div class="card">
+                <h3>Get Current User</h3>
+                <button class="btn" onclick="getCurrentUser()">Get User Profile</button>
+                <button class="btn danger" onclick="logout()">Logout</button>
+                <div id="user-response" class="response"></div>
+            </div>
+        </div>
+
+        <!-- Service Requests Tab -->
+        <div id="requests" class="tab-content">
+            <div class="card">
+                <h3>Create Service Request</h3>
+                <div class="input-group">
+                    <label>Title</label>
+                    <input type="text" id="req-title" value="Fix my kitchen sink">
+                </div>
+                <div class="input-group">
+                    <label>Description</label>
+                    <textarea id="req-description" rows="3">The kitchen sink is leaking and needs professional repair.</textarea>
+                </div>
+                <div class="input-group">
+                    <label>Latitude</label>
+                    <input type="number" id="req-lat" value="40.7128" step="any">
+                </div>
+                <div class="input-group">
+                    <label>Longitude</label>
+                    <input type="number" id="req-lng" value="-74.0060" step="any">
+                </div>
+                <div class="input-group">
+                    <label>Category</label>
+                    <select id="req-category">
+                        <option value="plumbing">Plumbing</option>
+                        <option value="electrical">Electrical</option>
+                        <option value="carpentry">Carpentry</option>
+                        <option value="painting">Painting</option>
+                        <option value="cleaning">Cleaning</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Urgency</label>
+                    <select id="req-urgency">
+                        <option value="low">Low</option>
+                        <option value="normal">Normal</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent</option>
+                    </select>
+                </div>
+                <button class="btn" onclick="createServiceRequest()">Create Request</button>
+                <div id="create-response" class="response"></div>
+            </div>
+
+            <div class="card">
+                <h3>Service Request Operations</h3>
+                <button class="btn" onclick="listServiceRequests()">List All Requests</button>
+                <button class="btn secondary" onclick="searchRequests()">Search Requests</button>
+                <div id="requests-response" class="response"></div>
+            </div>
+        </div>
+
+        <!-- Monitoring Tab -->
+        <div id="monitoring" class="tab-content">
+            <div class="grid">
+                <div class="metric">
+                    <div class="metric-value" id="health-status">-</div>
+                    <div class="metric-label">Health Status</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" id="uptime">-</div>
+                    <div class="metric-label">System Uptime</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" id="total-users">-</div>
+                    <div class="metric-label">Total Users</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" id="total-requests">-</div>
+                    <div class="metric-label">Service Requests</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>System Monitoring</h3>
+                <button class="btn" onclick="getHealthCheck()">Health Check</button>
+                <button class="btn secondary" onclick="getDashboard()">Dashboard</button>
+                <button class="btn secondary" onclick="getMetrics()">Metrics</button>
+                <div id="monitoring-response" class="response"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api';
+        let authToken = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            testHealth();
+            loadStoredToken();
+        });
+
+        // Tab switching
+        function showTab(tabName) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+        }
+
+        // API helper functions
+        async function apiCall(endpoint, options = {}) {
+            const url = `${API_BASE}${endpoint}`;
+            const config = {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    ...options.headers
+                },
+                ...options
+            };
+
+            try {
+                const response = await fetch(url, config);
+                const data = await response.json();
+                return { response, data };
+            } catch (error) {
+                return { error: error.message };
+            }
+        }
+
+        function showResponse(elementId, result) {
+            const element = document.getElementById(elementId);
+            if (result.error) {
+                element.innerHTML = `ERROR: ${result.error}`;
+                element.style.borderColor = '#dc3545';
+            } else {
+                element.innerHTML = `Status: ${result.response.status}\n\n${JSON.stringify(result.data, null, 2)}`;
+                element.style.borderColor = result.response.ok ? '#28a745' : '#dc3545';
+            }
+        }
+
+        function updateConnectionStatus(status, text) {
+            const statusElement = document.getElementById('connection-status');
+            statusElement.className = `status ${status}`;
+            statusElement.textContent = text;
+        }
+
+        function storeToken(token) {
+            authToken = token;
+            localStorage.setItem('otex_api_token', token);
+        }
+
+        function loadStoredToken() {
+            const stored = localStorage.getItem('otex_api_token');
+            if (stored) {
+                authToken = stored;
+            }
+        }
+
+        function clearToken() {
+            authToken = null;
+            localStorage.removeItem('otex_api_token');
+        }
+
+        // Quick Test Functions
+        async function testHealth() {
+            updateConnectionStatus('pending', 'Testing...');
+            const result = await apiCall('/monitoring/health');
+            showResponse('quick-response', result);
+            
+            if (result.response && result.response.ok) {
+                updateConnectionStatus('success', 'Connected');
+                document.getElementById('health-status').textContent = 'Healthy';
+            } else {
+                updateConnectionStatus('error', 'Connection Failed');
+                document.getElementById('health-status').textContent = 'Error';
+            }
+        }
+
+        async function testDashboard() {
+            const result = await apiCall('/monitoring/dashboard');
+            showResponse('quick-response', result);
+            
+            if (result.data && result.data.overview) {
+                document.getElementById('uptime').textContent = result.data.overview.uptime || '-';
+            }
+        }
+
+        // Authentication Functions
+        async function registerUser() {
+            const userData = {
+                name: document.getElementById('reg-name').value,
+                email: document.getElementById('reg-email').value,
+                password: document.getElementById('reg-password').value,
+                password_confirmation: document.getElementById('reg-password').value,
+                role: document.getElementById('reg-role').value
+            };
+
+            const result = await apiCall('/register', {
+                method: 'POST',
+                body: JSON.stringify(userData)
+            });
+            
+            showResponse('register-response', result);
+            
+            if (result.data && result.data.access_token) {
+                storeToken(result.data.access_token);
+            }
+        }
+
+        async function loginUser() {
+            const loginData = {
+                email: document.getElementById('login-email').value,
+                password: document.getElementById('login-password').value
+            };
+
+            const result = await apiCall('/login', {
+                method: 'POST',
+                body: JSON.stringify(loginData)
+            });
+            
+            showResponse('login-response', result);
+            
+            if (result.data && result.data.access_token) {
+                storeToken(result.data.access_token);
+            }
+        }
+
+        async function getCurrentUser() {
+            if (!authToken) {
+                showResponse('user-response', { error: 'No authentication token available' });
+                return;
+            }
+
+            const result = await apiCall('/me', {
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+            
+            showResponse('user-response', result);
+        }
+
+        async function logout() {
+            if (!authToken) {
+                showResponse('user-response', { error: 'No authentication token available' });
+                return;
+            }
+
+            const result = await apiCall('/logout', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+            
+            showResponse('user-response', result);
+            clearToken();
+        }
+
+        // Service Request Functions
+        async function createServiceRequest() {
+            if (!authToken) {
+                showResponse('create-response', { error: 'Please login first' });
+                return;
+            }
+
+            const requestData = {
+                title: document.getElementById('req-title').value,
+                description: document.getElementById('req-description').value,
+                latitude: parseFloat(document.getElementById('req-lat').value),
+                longitude: parseFloat(document.getElementById('req-lng').value),
+                category: document.getElementById('req-category').value,
+                urgency: document.getElementById('req-urgency').value
+            };
+
+            const result = await apiCall('/requests', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${authToken}` },
+                body: JSON.stringify(requestData)
+            });
+            
+            showResponse('create-response', result);
+        }
+
+        async function listServiceRequests() {
+            if (!authToken) {
+                showResponse('requests-response', { error: 'Please login first' });
+                return;
+            }
+
+            const result = await apiCall('/requests', {
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+            
+            showResponse('requests-response', result);
+        }
+
+        async function searchRequests() {
+            if (!authToken) {
+                showResponse('requests-response', { error: 'Please login first' });
+                return;
+            }
+
+            const result = await apiCall('/requests?search=kitchen', {
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+            
+            showResponse('requests-response', result);
+        }
+
+        // Monitoring Functions
+        async function getHealthCheck() {
+            const result = await apiCall('/monitoring/health');
+            showResponse('monitoring-response', result);
+        }
+
+        async function getDashboard() {
+            const result = await apiCall('/monitoring/dashboard');
+            showResponse('monitoring-response', result);
+            
+            if (result.data) {
+                if (result.data.business) {
+                    document.getElementById('total-users').textContent = result.data.business.users || '-';
+                    document.getElementById('total-requests').textContent = result.data.business.service_requests || '-';
+                }
+                if (result.data.overview) {
+                    document.getElementById('uptime').textContent = result.data.overview.uptime || '-';
+                }
+            }
+        }
+
+        async function getMetrics() {
+            if (!authToken) {
+                showResponse('monitoring-response', { error: 'Authentication required for metrics' });
+                return;
+            }
+
+            const result = await apiCall('/monitoring/metrics/all', {
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+            
+            showResponse('monitoring-response', result);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+2026-04-08 08:08:53,581 INFO Set uid to user 1000 succeeded
+2026-04-08 08:08:53,584 INFO supervisord started with pid 1
+2026-04-08 08:08:54,584 INFO spawned: 'php-fpm' with pid 7
+2026-04-08 08:08:54,585 INFO spawnerr: unknown error making dispatchers for 'cron': EACCES
+2026-04-08 08:08:54,585 INFO spawnerr: unknown error making dispatchers for 'laravel-worker_00': EACCES
+2026-04-08 08:08:54,585 INFO spawnerr: unknown error making dispatchers for 'laravel-worker_01': EACCES
+2026-04-08 08:08:55,618 INFO success: php-fpm entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+2026-04-08 08:08:55,619 INFO spawnerr: unknown error making dispatchers for 'cron': EACCES
+2026-04-08 08:08:55,619 INFO spawnerr: unknown error making dispatchers for 'laravel-worker_00': EACCES
+2026-04-08 08:08:55,619 INFO spawnerr: unknown error making dispatchers for 'laravel-worker_01': EACCES
+2026-04-08 08:08:57,622 INFO spawnerr: unknown error making dispatchers for 'cron': EACCES
+2026-04-08 08:08:57,622 INFO spawnerr: unknown error making dispatchers for 'laravel-worker_00': EACCES
+2026-04-08 08:08:57,622 INFO spawnerr: unknown error making dispatchers for 'laravel-worker_01': EACCES
+2026-04-08 08:09:00,626 INFO spawnerr: unknown error making dispatchers for 'cron': EACCES
+2026-04-08 08:09:00,626 INFO gave up: cron entered FATAL state, too many start retries too quickly
+2026-04-08 08:09:00,626 INFO spawnerr: unknown error making dispatchers for 'laravel-worker_00': EACCES
+2026-04-08 08:09:00,627 INFO gave up: laravel-worker_00 entered FATAL state, too many start retries too quickly
+2026-04-08 08:09:00,627 INFO spawnerr: unknown error making dispatchers for 'laravel-worker_01': EACCES
+2026-04-08 08:09:00,627 INFO gave up: laravel-worker_01 entered FATAL state, too many start retries too quickly

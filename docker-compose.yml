@@ -1,0 +1,196 @@
+services:
+  # Laravel Backend Application
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: saasfoodtech_backend
+    restart: unless-stopped
+    working_dir: /var/www/html
+    volumes:
+      - ./backend:/var/www/html
+      - ./backend/storage/app/public:/var/www/html/storage/app/public
+    networks:
+      - saasfoodtech_network
+    depends_on:
+      - mysql
+      - redis
+    environment:
+      - APP_NAME=FoodTech SAAS
+      - APP_ENV=local
+      - APP_KEY=base64:oJPvEqVrzzrEzr3jtQjDt9r/Lw6g3sDiiqWnhuwmv0k=
+      - APP_DEBUG=true
+      - APP_URL=http://localhost:8000
+      - DB_CONNECTION=mysql
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=saas_foodtech
+      - DB_USERNAME=root
+      - DB_PASSWORD=
+      - BROADCAST_CONNECTION=reverb
+      - CACHE_DRIVER=redis
+      - FILESYSTEM_DISK=local
+      - QUEUE_CONNECTION=redis
+      - SESSION_DRIVER=redis
+      - SESSION_LIFETIME=120
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD=null
+      - REDIS_PORT=6379
+      # ── Reverb (WebSocket) ───────────────────────────────────
+      - REVERB_APP_ID=foodtech-app
+      - REVERB_APP_KEY=foodtech-reverb-key
+      - REVERB_APP_SECRET=foodtech-reverb-secret
+      - REVERB_HOST=reverb
+      - REVERB_PORT=8080
+      - REVERB_SCHEME=http
+      # ────────────────────────────────────────────────────────
+      - JWT_SECRET=3vXq8u2N5wL0rG9zR4aCvT4pViKaUlMgbQ6n9PbXqAfH
+      - MAIL_MAILER=smtp
+      - MAIL_HOST=mailpit
+      - MAIL_PORT=1025
+      - MAIL_USERNAME=null
+      - MAIL_PASSWORD=null
+      - MAIL_ENCRYPTION=null
+      - MAIL_FROM_ADDRESS="hello@foodtech.example.com"
+      - MAIL_FROM_NAME="${APP_NAME}"
+
+  # ── Laravel Reverb WebSocket Server ─────────────────────────
+  reverb:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: saasfoodtech_reverb
+    restart: unless-stopped
+    working_dir: /var/www/html
+    command: php artisan reverb:start --host=0.0.0.0 --port=8080 --debug
+    volumes:
+      - ./backend:/var/www/html
+    networks:
+      - saasfoodtech_network
+    ports:
+      - "8080:8080"
+    depends_on:
+      - redis
+      - mysql
+    environment:
+      - APP_NAME=FoodTech SAAS
+      - APP_ENV=local
+      - APP_KEY=base64:oJPvEqVrzzrEzr3jtQjDt9r/Lw6g3sDiiqWnhuwmv0k=
+      - APP_DEBUG=true
+      - DB_CONNECTION=mysql
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=saas_foodtech
+      - DB_USERNAME=root
+      - DB_PASSWORD=
+      - BROADCAST_CONNECTION=reverb
+      - REVERB_APP_ID=foodtech-app
+      - REVERB_APP_KEY=foodtech-reverb-key
+      - REVERB_APP_SECRET=foodtech-reverb-secret
+      - REVERB_HOST=0.0.0.0
+      - REVERB_PORT=8080
+      - REVERB_SCHEME=http
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+  # Nginx Web Server
+  nginx:
+    image: nginx:alpine
+    container_name: saasfoodtech_nginx
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    volumes:
+      - ./backend:/var/www/html
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - saasfoodtech_network
+    depends_on:
+      - backend
+
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: saasfoodtech_mysql
+    restart: unless-stopped
+    ports:
+      - "3307:3306"
+    environment:
+      - MYSQL_DATABASE=saas_foodtech
+      - MYSQL_ALLOW_EMPTY_PASSWORD=yes
+      - MYSQL_ROOT_PASSWORD=
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/my.cnf:/etc/mysql/my.cnf
+    networks:
+      - saasfoodtech_network
+
+  # Redis Cache and Queue
+  redis:
+    image: redis:7-alpine
+    container_name: saasfoodtech_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - saasfoodtech_network
+    command: redis-server --appendonly yes
+
+  # Frontend Application
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: saasfoodtech_frontend
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - saasfoodtech_network
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api
+      - NEXT_PUBLIC_REVERB_APP_KEY=foodtech-reverb-key
+      - NEXT_PUBLIC_REVERB_HOST=localhost
+      - NEXT_PUBLIC_REVERB_PORT=8080
+      - NEXT_PUBLIC_REVERB_SCHEME=http
+      - NODE_ENV=development
+
+  # Mailpit for Email Testing
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: saasfoodtech_mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - saasfoodtech_network
+
+  # Redis Commander (Optional - Redis GUI)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: saasfoodtech_redis_commander
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    networks:
+      - saasfoodtech_network
+    depends_on:
+      - redis
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  saasfoodtech_network:
+    driver: bridge

@@ -1,0 +1,52 @@
+# Laravel
+/backend/vendor/
+/backend/storage/*.key
+/backend/storage/framework/cache/data/*
+/backend/storage/framework/sessions/*
+/backend/storage/framework/views/*
+/backend/.env
+/backend/public/storage
+
+# Next.js
+/frontend/node_modules/
+/frontend/.next/
+/frontend/out/
+/frontend/build
+/frontend/.env.local
+/frontend/.env.development.local
+/frontend/.env.test.local
+/frontend/.env.production.local
+
+# Docker
+.docker_data/
+mysql_data/
+redis_data/
+
+# Project Management & Internal Docs
+Plan.md
+Task.md
+Task_Step2.md
+*Report.md
+Missings.md
+MissingRequiermnets.md
+REBRANDING_INFRASTRUCTURE_UPDATE.md
+Archicture.md
+API_DOCS.md
+RUN_PROJECT.md
+backend/API_DOCUMENTATION.md
+backend/DOCUMENTATION_ACCESS.md
+backend/SWAGGER_*.md
+backend/TESTING_*.md
+backend/api-documentation.yaml
+backend/public/swagger-test.html
+backend/test_api.php
+backend/test_dashboard.html
+backend/create_db.php
+backend/create_test_users.php
+backend/quick_create_users.php
+api-docs.yaml
+api-documentation.yaml
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,115 @@
+services:
+  # Laravel Backend Application
+  app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: foodtech_app
+    restart: unless-stopped
+    working_dir: /var/www/html
+    volumes:
+      - ./backend:/var/www/html
+      - ./backend/storage/app/public:/var/www/html/storage/app/public
+    networks:
+      - foodtech_network
+    depends_on:
+      - mysql
+      - redis
+    environment:
+      - APP_NAME="FoodTech SAAS Platform"
+      - APP_ENV=production
+      - APP_KEY=${APP_KEY}
+      - APP_DEBUG=false
+      - APP_URL=http://localhost
+      - DB_CONNECTION=mysql
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=foodtech_platform
+      - DB_USERNAME=foodtech_user
+      - DB_PASSWORD=${DB_PASSWORD}
+      - BROADCAST_DRIVER=log
+      - CACHE_DRIVER=redis
+      - FILESYSTEM_DISK=local
+      - QUEUE_CONNECTION=redis
+      - SESSION_DRIVER=redis
+      - SESSION_LIFETIME=120
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD=null
+      - REDIS_PORT=6379
+      - JWT_SECRET=${JWT_SECRET}
+      - MAIL_MAILER=smtp
+      - MAIL_HOST=mailpit
+      - MAIL_PORT=1025
+      - MAIL_USERNAME=null
+      - MAIL_PASSWORD=null
+      - MAIL_ENCRYPTION=null
+      - MAIL_FROM_ADDRESS="hello@foodtech.com"
+      - MAIL_FROM_NAME="${APP_NAME}"
+
+  # Nginx Web Server
+  nginx:
+    image: nginx:alpine
+    container_name: foodtech_nginx
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    volumes:
+      - ./backend:/var/www/html
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - foodtech_network
+    depends_on:
+      - app
+
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: foodtech_mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: foodtech_platform
+      MYSQL_USER: foodtech_user
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - foodtech_network
+    command: --default-authentication-plugin=mysql_native_password
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: foodtech_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - foodtech_network
+    command: redis-server --appendonly yes
+
+  # Mailpit for email testing
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: foodtech_mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - foodtech_network
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  foodtech_network:
+    driver: bridge

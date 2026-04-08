@@ -1,0 +1,759 @@
+openapi: 3.0.3
+info:
+  title: FoodTech SAAS Platform API
+  description: A comprehensive FoodTech SAAS platform connecting restaurants with customers for food delivery and ordering services
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@foodtech.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8000/api
+    description: Development Server
+  - url: https://api.foodtech.com/api
+    description: Production Server
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Authentication
+    description: User authentication and authorization endpoints
+  - name: Restaurants
+    description: Restaurant management and menu endpoints
+  - name: Orders
+    description: Food order management endpoints
+  - name: Menu Items
+    description: Menu item management endpoints
+  - name: Delivery
+    description: Delivery tracking and management endpoints
+  - name: Payments
+    description: Payment processing endpoints
+  - name: File Attachments
+    description: File upload and download endpoints
+  - name: Monitoring
+    description: System monitoring and health check endpoints
+
+paths:
+  /register:
+    post:
+      tags:
+        - Authentication
+      summary: Register a new user
+      description: Create a new user account and return authentication token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - email
+                - password
+                - password_confirmation
+              properties:
+                name:
+                  type: string
+                  example: John Doe
+                email:
+                  type: string
+                  format: email
+                  example: john@example.com
+                password:
+                  type: string
+                  format: password
+                  example: Password123!
+                password_confirmation:
+                  type: string
+                  format: password
+                  example: Password123!
+                role:
+                  type: string
+                  enum: [customer, restaurant_owner, delivery_driver]
+                  example: customer
+                phone:
+                  type: string
+                  example: +1234567890
+                restaurant_name:
+                  type: string
+                  example: John's Restaurant
+                address:
+                  type: string
+                  example: 123 Main St, City, State
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  access_token:
+                    type: string
+                    example: 1|abc123...
+                  token_type:
+                    type: string
+                    example: Bearer
+                  user:
+                    $ref: '#/components/schemas/User'
+                  request_id:
+                    type: string
+                    example: req_1234567890
+                  timestamp:
+                    type: string
+                    format: date-time
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: object
+                  request_id:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /login:
+    post:
+      tags:
+        - Authentication
+      summary: Login user
+      description: Authenticate user and return JWT token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: john@example.com
+                password:
+                  type: string
+                  format: password
+                  example: Password123!
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  access_token:
+                    type: string
+                    example: 1|abc123...
+                  token_type:
+                    type: string
+                    example: Bearer
+                  user:
+                    $ref: '#/components/schemas/User'
+                  request_id:
+                    type: string
+                    example: req_1234567890
+                  timestamp:
+                    type: string
+                    format: date-time
+        '422':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: object
+                  request_id:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /me:
+    get:
+      tags:
+        - Authentication
+      summary: Get current user
+      description: Get the authenticated user's profile information
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/User'
+                  request_id:
+                    type: string
+                    example: req_1234567890
+                  timestamp:
+                    type: string
+                    format: date-time
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: Unauthorized
+                  request_id:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /logout:
+    post:
+      tags:
+        - Authentication
+      summary: Logout user
+      description: Logout the authenticated user and revoke current token
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Logged out successfully
+                  request_id:
+                    type: string
+                    example: req_1234567890
+                  timestamp:
+                    type: string
+                    format: date-time
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: Unauthorized
+                  request_id:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /orders:
+    get:
+      tags:
+        - Orders
+      summary: List food orders
+      description: Get a list of food orders with optional filtering
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          description: Filter by order status
+          required: false
+          schema:
+            type: string
+            enum: [pending, confirmed, preparing, ready, picked_up, delivered, cancelled]
+        - name: restaurant_id
+          in: query
+          description: Filter by restaurant
+          required: false
+          schema:
+            type: integer
+        - name: search
+          in: query
+          description: Search in order items
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Food orders retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Order'
+                  meta:
+                    type: object
+                    properties:
+                      current_page:
+                        type: integer
+                        example: 1
+                      per_page:
+                        type: integer
+                        example: 15
+                      total:
+                        type: integer
+                        example: 50
+                  request_id:
+                    type: string
+                    example: req_1234567890
+                  timestamp:
+                    type: string
+                    format: date-time
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: Unauthorized
+                  request_id:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+
+    post:
+      tags:
+        - Orders
+      summary: Create food order
+      description: Create a new food order from a restaurant
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - restaurant_id
+                - items
+                - delivery_address
+              properties:
+                restaurant_id:
+                  type: integer
+                  example: 1
+                items:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      menu_item_id:
+                        type: integer
+                        example: 1
+                      quantity:
+                        type: integer
+                        example: 2
+                      special_instructions:
+                        type: string
+                        example: No onions please
+                delivery_address:
+                  type: string
+                  example: 123 Main St, Apt 4B, City, State 12345
+                delivery_instructions:
+                  type: string
+                  example: Ring doorbell when you arrive
+                payment_method:
+                  type: string
+                  enum: [cash, card, online]
+                  example: online
+                estimated_delivery_time:
+                  type: string
+                  format: date-time
+                  example: 2023-12-01T19:30:00Z
+      responses:
+        '201':
+          description: Food order created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Order'
+                  request_id:
+                    type: string
+                    example: req_1234567890
+                  timestamp:
+                    type: string
+                    format: date-time
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: object
+                  request_id:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /monitoring/health:
+    get:
+      tags:
+        - Monitoring
+      summary: Health check
+      description: Check the health status of the API and its dependencies
+      responses:
+        '200':
+          description: System health status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        example: healthy
+                      timestamp:
+                        type: string
+                        format: date-time
+                      services:
+                        type: object
+                        properties:
+                          database:
+                            type: string
+                            example: connected
+                          cache:
+                            type: string
+                            example: connected
+                          queue:
+                            type: string
+                            example: running
+                  request_id:
+                    type: string
+                    example: req_1234567890
+                  timestamp:
+                    type: string
+                    format: date-time
+
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: John Doe
+        email:
+          type: string
+          format: email
+          example: john@example.com
+        plan:
+          type: string
+          enum: [free, basic, premium, enterprise]
+          example: free
+        phone:
+          type: string
+          example: +1234567890
+        restaurant_name:
+          type: string
+          example: John's Restaurant
+        address:
+          type: string
+          example: 123 Main St, City, State 12345
+        delivery_zone:
+          type: string
+          example: Downtown, Midtown
+        created_at:
+          type: string
+          format: date-time
+          example: 2023-12-01T10:00:00Z
+        updated_at:
+          type: string
+          format: date-time
+          example: 2023-12-01T10:00:00Z
+        roles:
+          type: array
+          items:
+            type: string
+          example: ["customer"]
+        permissions:
+          type: array
+          items:
+            type: string
+          example: ["create-order", "view-own-orders", "manage-restaurant"]
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        order_number:
+          type: string
+          example: ORD-2023-001
+        status:
+          type: string
+          enum: [pending, confirmed, preparing, ready, picked_up, delivered, cancelled]
+          example: pending
+        restaurant:
+          $ref: '#/components/schemas/Restaurant'
+        customer:
+          $ref: '#/components/schemas/User'
+        delivery_driver:
+          $ref: '#/components/schemas/User'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        total_amount:
+          type: number
+          format: float
+          example: 45.99
+        delivery_fee:
+          type: number
+          format: float
+          example: 5.99
+        tax:
+          type: number
+          format: float
+          example: 3.67
+        delivery_address:
+          type: string
+          example: 123 Main St, Apt 4B, City, State 12345
+        estimated_delivery_time:
+          type: string
+          format: date-time
+          example: 2023-12-01T19:30:00Z
+        actual_delivery_time:
+          type: string
+          format: date-time
+          example: 2023-12-01T19:25:00Z
+        payment_status:
+          type: string
+          enum: [pending, paid, refunded]
+          example: pending
+        payment_method:
+          type: string
+          enum: [cash, card, online]
+          example: online
+        created_at:
+          type: string
+          format: date-time
+          example: 2023-12-01T18:45:00Z
+        updated_at:
+          type: string
+          format: date-time
+          example: 2023-12-01T19:25:00Z
+
+    Restaurant:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: John's Restaurant
+        description:
+          type: string
+          example: Authentic Italian cuisine with fresh ingredients
+        cuisine_type:
+          type: string
+          example: Italian
+        address:
+          type: string
+          example: 456 Oak Ave, City, State 12345
+        phone:
+          type: string
+          example: +1234567890
+        email:
+          type: string
+          example: contact@johnsrestaurant.com
+        rating:
+          type: number
+          format: float
+          example: 4.5
+        delivery_radius:
+          type: number
+          format: float
+          example: 5.0
+        average_preparation_time:
+          type: integer
+          example: 25
+        is_open:
+          type: boolean
+          example: true
+        operating_hours:
+          type: object
+          properties:
+            monday:
+              type: string
+              example: "11:00-22:00"
+            tuesday:
+              type: string
+              example: "11:00-22:00"
+        created_at:
+          type: string
+          format: date-time
+          example: 2023-11-01T10:00:00Z
+        updated_at:
+          type: string
+          format: date-time
+          example: 2023-12-01T15:30:00Z
+
+    OrderItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        menu_item:
+          $ref: '#/components/schemas/MenuItem'
+        quantity:
+          type: integer
+          example: 2
+        unit_price:
+          type: number
+          format: float
+          example: 18.50
+        total_price:
+          type: number
+          format: float
+          example: 37.00
+        special_instructions:
+          type: string
+          example: No onions please
+        status:
+          type: string
+          enum: [ordered, preparing, ready]
+          example: ordered
+
+    MenuItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Margherita Pizza
+        description:
+          type: string
+          example: Fresh mozzarella, tomato sauce, basil
+        category:
+          type: string
+          example: Pizza
+        price:
+          type: number
+          format: float
+          example: 18.50
+        image_url:
+          type: string
+          example: https://example.com/images/margherita.jpg
+        is_available:
+          type: boolean
+          example: true
+        preparation_time:
+          type: integer
+          example: 15
+        ingredients:
+          type: array
+          items:
+            type: string
+          example: ["mozzarella", "tomato sauce", "basil", "olive oil"]
+        allergens:
+          type: array
+          items:
+            type: string
+          example: ["gluten", "dairy"]
+        nutritional_info:
+          type: object
+          properties:
+            calories:
+              type: integer
+              example: 280
+            protein:
+              type: number
+              format: float
+              example: 12.5
+            carbs:
+              type: number
+              format: float
+              example: 35.2
+            fat:
+              type: number
+              format: float
+              example: 10.8
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT authentication token obtained from login endpoint
