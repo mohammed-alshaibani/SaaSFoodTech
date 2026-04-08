@@ -3,45 +3,69 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Log;
-use OpenAI\Laravel\Facades\OpenAI;
+use GuzzleHttp\Client as GuzzleClient;
+use GuzzleHttp\Exception\RequestException;
 
 class DescriptionEnhancerService
 {
-    private const MODEL = 'gpt-4o-mini';
+    private const MODEL = 'gemini-1.5-flash';
     private const MAX_TOKENS = 500;
 
     /**
-     * Enhance a service description using OpenAI.
+     * Enhance a service description using Gemini AI.
      * Falls back to the original description if the API call fails for any reason —
      * this ensures the form can always be submitted (graceful degradation).
      */
     public function enhance(string $title, string $currentDescription): string
     {
         try {
-            $result = OpenAI::chat()->create([
-                'model' => self::MODEL,
-                'max_tokens' => self::MAX_TOKENS,
-                'messages' => [
-                    [
-                        'role' => 'system',
-                        'content' => 'You are a professional service request writer for a marketplace platform. '
-                            . 'Your job is to rewrite rough customer descriptions into clear, professional, '
-                            . 'concise service requests (2-3 sentences). Output only the rewritten text.',
+            $apiKey = config('services.gemini.api_key');
+            $client = new GuzzleClient();
+            
+            $prompt = 'You are a professional service request writer for a marketplace platform. '
+                    . 'Your job is to rewrite rough customer descriptions into clear, professional, '
+                    . 'concise service requests (2-3 sentences). Output only the rewritten text.'
+                    . "\n\n" . $this->buildPrompt($title, $currentDescription);
+
+            $response = $client->post("https://generativelanguage.googleapis.com/v1beta/models/" . self::MODEL . ":generateContent?key=" . $apiKey, [
+                'json' => [
+                    'contents' => [
+                        [
+                            'parts' => [
+                                [
+                                    'text' => $prompt
+                                ]
+                            ]
+                        ]
                     ],
-                    [
-                        'role' => 'user',
-                        'content' => $this->buildPrompt($title, $currentDescription),
-                    ],
+                    'generationConfig' => [
+                        'maxOutputTokens' => self::MAX_TOKENS,
+                        'temperature' => 0.7,
+                    ]
                 ],
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                ]
             ]);
 
-            $enhanced = $result->choices[0]->message->content ?? null;
+            $result = json_decode($response->getBody()->getContents(), true);
+            $enhanced = $result['candidates'][0]['content']['parts'][0]['text'] ?? null;
 
-            // Return fallback if OpenAI returns empty content
+            // Return fallback if Gemini returns empty content
             return filled($enhanced) ? trim($enhanced) : $currentDescription;
 
+        } catch (RequestException $e) {
+            // Log real error server-side; never expose it to the API response
+            Log::warning('AI description enhance failed', [
+                'error' => $e->getMessage(),
+                'title' => $title,
+                'response' => $e->hasResponse() ? $e->getResponse()->getBody()->getContents() : null,
+            ]);
+
+            // Graceful degradation — return original unchanged
+            return $currentDescription;
         } catch (\Throwable $e) {
-            // Log the real error server-side; never expose it to the API response
+            // Log any other unexpected errors
             Log::warning('AI description enhance failed', [
                 'error' => $e->getMessage(),
                 'title' => $title,

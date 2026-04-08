@@ -3,11 +3,12 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Log;
-use OpenAI\Laravel\Facades\OpenAI;
+use GuzzleHttp\Client as GuzzleClient;
+use GuzzleHttp\Exception\RequestException;
 
 class OrderCategorizationService
 {
-    private const MODEL = 'gpt-4o-mini';
+    private const MODEL = 'gemini-1.5-flash';
     private const MAX_TOKENS = 300;
 
     /**
@@ -17,29 +18,42 @@ class OrderCategorizationService
     public function categorize(string $title, string $description): array
     {
         try {
-            $result = OpenAI::chat()->create([
-                'model' => self::MODEL,
-                'max_tokens' => self::MAX_TOKENS,
-                'messages' => [
-                    [
-                        'role' => 'system',
-                        'content' => 'You are a food delivery service categorizer. '
-                            . 'Analyze the service request and categorize it into one of the following categories: '
-                            . 'restaurant_delivery, grocery_delivery, meal_kit, catering, food_courier, other. '
-                            . 'Also provide a suggested price range (low, medium, high) based on complexity. '
-                            . 'Respond in JSON format: {"category": "category_name", "price_range": "range", "confidence": 0.95}',
+            $apiKey = config('services.gemini.api_key');
+            $client = new GuzzleClient();
+            
+            $prompt = 'You are a food delivery service categorizer. '
+                    . 'Analyze the service request and categorize it into one of the following categories: '
+                    . 'restaurant_delivery, grocery_delivery, meal_kit, catering, food_courier, other. '
+                    . 'Also provide a suggested price range (low, medium, high) based on complexity. '
+                    . 'Respond in JSON format: {"category": "category_name", "price_range": "range", "confidence": 0.95}'
+                    . "\n\n" . $this->buildCategorizationPrompt($title, $description);
+
+            $response = $client->post("https://generativelanguage.googleapis.com/v1beta/models/" . self::MODEL . ":generateContent?key=" . $apiKey, [
+                'json' => [
+                    'contents' => [
+                        [
+                            'parts' => [
+                                [
+                                    'text' => $prompt
+                                ]
+                            ]
+                        ]
                     ],
-                    [
-                        'role' => 'user',
-                        'content' => $this->buildCategorizationPrompt($title, $description),
-                    ],
+                    'generationConfig' => [
+                        'maxOutputTokens' => self::MAX_TOKENS,
+                        'temperature' => 0.3,
+                    ]
                 ],
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                ]
             ]);
 
-            $response = $result->choices[0]->message->content ?? null;
+            $result = json_decode($response->getBody()->getContents(), true);
+            $responseText = $result['candidates'][0]['content']['parts'][0]['text'] ?? null;
 
             // Parse JSON response
-            $categorization = json_decode($response, true);
+            $categorization = json_decode($responseText, true);
 
             if (json_last_error() === JSON_ERROR_NONE && isset($categorization['category'])) {
                 return [
@@ -53,6 +67,15 @@ class OrderCategorizationService
             // Fallback to rule-based categorization
             return $this->ruleBasedCategorization($title, $description);
 
+        } catch (RequestException $e) {
+            // Log error and fallback to rule-based categorization
+            Log::warning('AI categorization failed', [
+                'error' => $e->getMessage(),
+                'title' => $title,
+                'response' => $e->hasResponse() ? $e->getResponse()->getBody()->getContents() : null,
+            ]);
+
+            return $this->ruleBasedCategorization($title, $description);
         } catch (\Throwable $e) {
             // Log error and fallback to rule-based categorization
             Log::warning('AI categorization failed', [
@@ -70,26 +93,39 @@ class OrderCategorizationService
     public function suggestPricing(string $title, string $description, string $category): array
     {
         try {
-            $result = OpenAI::chat()->create([
-                'model' => self::MODEL,
-                'max_tokens' => self::MAX_TOKENS,
-                'messages' => [
-                    [
-                        'role' => 'system',
-                        'content' => 'You are a food delivery pricing expert. '
-                            . 'Analyze the service request and suggest appropriate pricing. '
-                            . 'Consider factors like complexity, time required, and market rates. '
-                            . 'Respond in JSON format: {"min_price": 25.00, "max_price": 75.00, "recommended_price": 45.00, "reasoning": "Based on complexity and time"}',
+            $apiKey = config('services.gemini.api_key');
+            $client = new GuzzleClient();
+            
+            $prompt = 'You are a food delivery pricing expert. '
+                    . 'Analyze the service request and suggest appropriate pricing. '
+                    . 'Consider factors like complexity, time required, and market rates. '
+                    . 'Respond in JSON format: {"min_price": 25.00, "max_price": 75.00, "recommended_price": 45.00, "reasoning": "Based on complexity and time"}'
+                    . "\n\n" . $this->buildPricingPrompt($title, $description, $category);
+
+            $response = $client->post("https://generativelanguage.googleapis.com/v1beta/models/" . self::MODEL . ":generateContent?key=" . $apiKey, [
+                'json' => [
+                    'contents' => [
+                        [
+                            'parts' => [
+                                [
+                                    'text' => $prompt
+                                ]
+                            ]
+                        ]
                     ],
-                    [
-                        'role' => 'user',
-                        'content' => $this->buildPricingPrompt($title, $description, $category),
-                    ],
+                    'generationConfig' => [
+                        'maxOutputTokens' => self::MAX_TOKENS,
+                        'temperature' => 0.2,
+                    ]
                 ],
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                ]
             ]);
 
-            $response = $result->choices[0]->message->content ?? null;
-            $pricing = json_decode($response, true);
+            $result = json_decode($response->getBody()->getContents(), true);
+            $responseText = $result['candidates'][0]['content']['parts'][0]['text'] ?? null;
+            $pricing = json_decode($responseText, true);
 
             if (json_last_error() === JSON_ERROR_NONE && isset($pricing['recommended_price'])) {
                 return [
@@ -104,6 +140,14 @@ class OrderCategorizationService
             // Fallback to rule-based pricing
             return $this->ruleBasedPricing($category);
 
+        } catch (RequestException $e) {
+            Log::warning('AI pricing suggestion failed', [
+                'error' => $e->getMessage(),
+                'title' => $title,
+                'response' => $e->hasResponse() ? $e->getResponse()->getBody()->getContents() : null,
+            ]);
+
+            return $this->ruleBasedPricing($category);
         } catch (\Throwable $e) {
             Log::warning('AI pricing suggestion failed', [
                 'error' => $e->getMessage(),

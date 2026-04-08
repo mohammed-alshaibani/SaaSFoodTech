@@ -23,7 +23,6 @@ mysql_data/
 redis_data/
 
 # Project Management & Internal Docs
-Plan.md
 Task.md
 Task_Step2.md
 *Report.md
