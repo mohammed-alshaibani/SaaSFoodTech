@@ -190,18 +190,112 @@ DB_PORT=3306
 DB_DATABASE=saas_foodtech
 DB_USERNAME=username
 DB_PASSWORD=password
-
 JWT_SECRET=your-jwt-secret
 REDIS_HOST=127.0.0.1
 REDIS_PASSWORD=null
 REDIS_PORT=6379
+GEMINI_API_KEY=your_gemini_api_key
+```
+
+### CI/CD Pipeline
+This project includes a comprehensive CI/CD pipeline using GitHub Actions:
+
+#### **Automated Testing & Quality Checks**
+- **Backend Testing**: PHPUnit with MySQL database
+- **Frontend Testing**: Jest/React component tests & build verification
+- **Code Quality**: PHPStan, PHP CodeSniffer, Laravel Pint
+- **Security Scanning**: Dependency vulnerability detection
+- **Build Verification**: Docker image building tests
+
+#### **Automated Deployment**
+- **Docker Image Building**: Automated multi-stage builds
+- **Production Deployment**: Zero-downtime deployments
+- **Health Monitoring**: Post-deployment verification
+- **Rollback Capability**: Automatic rollback on failure
+
+#### **Pipeline Triggers**
+```yaml
+# Push to develop → CI only (testing)
+# Push to main → CI + CD (deploy to production)
+# Git tags → CI + CD (versioned releases)
 ```
 
 ### Production Deployment
+
+#### **Option 1: Automated Deployment (Recommended)**
+```bash
+# The CI/CD pipeline handles deployment automatically when:
+# - Pushing to main branch
+# - Creating a git tag (v1.0.0, v1.1.0, etc.)
+
+# Manual deployment trigger:
+curl -X POST \
+  -H "Authorization: token $GITHUB_TOKEN" \
+  -H "Accept: application/vnd.github.v3+json" \
+  https://api.github.com/repos/owner/repo/actions/workflows/deploy/dispatches \
+  -d '{"ref":"main","inputs":{"environment":"production"}}'
+```
+
+#### **Option 2: Manual Deployment**
+```bash
+# Use the deployment scripts
+./scripts/deploy.sh deploy          # Deploy latest version
+./scripts/deploy.sh deploy v1.2.0  # Deploy specific version
+./scripts/deploy.sh rollback        # Rollback to previous version
+```
+
+#### **Option 3: Health Monitoring**
+```bash
+# Continuous health monitoring
+./scripts/health-check.sh watch          # Watch mode (updates every 60s)
+./scripts/health-check.sh report         # One-time health report
+./scripts/health-check.sh detailed mysql # Detailed service information
+```
+
+### Required GitHub Secrets
+Configure these in GitHub repository settings:
+```bash
+DOCKER_USERNAME=your_dockerhub_username
+DOCKER_PASSWORD=your_dockerhub_password
+PROD_HOST=production_server_ip
+PROD_USER=deploy_user
+PROD_SSH_KEY=private_ssh_key
+APP_URL=https://yourdomain.com
+FRONTEND_URL=https://yourdomain.com
+SLACK_WEBHOOK=your_slack_webhook_url
+```
+
+### Production Environment Variables
+```env
+DB_CONNECTION=mysql
+DB_HOST=mysql
+DB_PORT=3306
+DB_DATABASE=saas_foodtech
+DB_USERNAME=saas_user
+DB_PASSWORD=secure_password
+JWT_SECRET=production_jwt_secret
+REDIS_HOST=redis
+REDIS_PASSWORD=redis_password
+REDIS_PORT=6379
+GEMINI_API_KEY=production_gemini_key
+APP_URL=https://yourdomain.com
+FRONTEND_URL=https://yourdomain.com
+LOG_CHANNEL=stack
+MAIL_MAILER=smtp
+MAIL_HOST=your_smtp_host
+MAIL_PORT=587
+MAIL_USERNAME=your_email_username
+MAIL_PASSWORD=your_email_password
+MAIL_ENCRYPTION=tls
+MAIL_FROM_ADDRESS=noreply@yourdomain.com
+```
+
+### Production Deployment Steps
 1. Configure environment variables
-2. Run database migrations: `php artisan migrate`
-3. Optimize application: `php artisan optimize`
-4. Start queue workers: `php artisan queue:work --daemon`
+2. Set up GitHub secrets
+3. Push to main branch (triggers automatic deployment)
+4. Monitor deployment via GitHub Actions
+5. Verify deployment with health check script
 
 ## 🔧 What Would Be Improved With More Time
 
