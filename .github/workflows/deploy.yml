@@ -89,6 +89,7 @@ jobs:
             export VERSION=${{ steps.meta.outputs.version }}
             export BACKEND_IMAGE=${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:$VERSION
             export FRONTEND_IMAGE=${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:$VERSION
+            export GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
             
             echo "🚀 Starting deployment of version $VERSION"
             
@@ -105,6 +106,61 @@ jobs:
             # Update images in docker-compose.prod.yml
             sed -i "s|yourusername/saas-foodtech-backend:latest|$BACKEND_IMAGE|g" docker-compose.prod.yml
             sed -i "s|yourusername/saas-foodtech-frontend:latest|$FRONTEND_IMAGE|g" docker-compose.prod.yml
+            
+            # Create/update .env file for production
+            cat > .env << EOF
+APP_NAME="FoodTech SAAS Platform"
+APP_ENV=production
+APP_KEY=${{ secrets.APP_KEY }}
+JWT_SECRET=${{ secrets.JWT_SECRET }}
+APP_DEBUG=false
+APP_TIMEZONE=UTC
+APP_URL=${{ secrets.APP_URL }}
+FRONTEND_URL=${{ secrets.FRONTEND_URL }}
+
+DB_CONNECTION=mysql
+DB_HOST=mysql
+DB_PORT=3306
+DB_DATABASE=saas_foodtech
+DB_USERNAME=${{ secrets.DB_USERNAME }}
+DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+
+SESSION_DRIVER=database
+SESSION_LIFETIME=120
+AUTH_API_DRIVER=sanctum
+
+BROADCAST_CONNECTION=reverb
+FILESYSTEM_DISK=local
+QUEUE_CONNECTION=redis
+CACHE_DRIVER=redis
+CACHE_PREFIX=foodtech_
+
+REDIS_HOST=redis
+REDIS_PORT=6379
+
+MAIL_MAILER=smtp
+MAIL_HOST=${{ secrets.MAIL_HOST }}
+MAIL_PORT=${{ secrets.MAIL_PORT }}
+MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}
+MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
+MAIL_ENCRYPTION=${{ secrets.MAIL_ENCRYPTION }}
+MAIL_FROM_ADDRESS="${{ secrets.MAIL_FROM_ADDRESS }}"
+MAIL_FROM_NAME="${APP_NAME}"
+
+REVERB_APP_ID=${{ secrets.REVERB_APP_ID }}
+REVERB_APP_KEY=${{ secrets.REVERB_APP_KEY }}
+REVERB_APP_SECRET=${{ secrets.REVERB_APP_SECRET }}
+REVERB_HOST=reverb
+REVERB_PORT=8080
+REVERB_SCHEME=http
+
+# Google Gemini AI
+GEMINI_API_KEY=$GEMINI_API_KEY
+GEMINI_MODEL=gemini-1.5-flash
+GEMINI_REQUEST_TIMEOUT=30
+GEMINI_MAX_TOKENS=500
+GEMINI_TEMPERATURE=0.7
+EOF
             
             # Pull latest images
             echo "📥 Pulling Docker images..."
