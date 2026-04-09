@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Role;
 use App\Models\Permission;
-use App\Models\RolePermissionsAudit;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -77,16 +76,6 @@ class RoleController extends Controller
                 }
             }
 
-            // Audit log
-            RolePermissionsAudit::create([
-                'role_id' => $role->id,
-                'permission_id' => null,
-                'action' => 'created',
-                'performed_by' => Auth::id(),
-                'reason' => 'Role created via API',
-                'new_values' => $role->toArray(),
-            ]);
-
             DB::commit();
 
             return response()->json([
@@ -112,9 +101,6 @@ class RoleController extends Controller
             'permissions',
             'parentRoles',
             'childRoles',
-            'auditRecords' => function ($query) {
-                $query->with('performedByUser', 'permission')->latest()->limit(50);
-            }
         ]);
 
         // Get all permissions (including inherited)
@@ -151,31 +137,6 @@ class RoleController extends Controller
             if (isset($validated['permissions'])) {
                 $oldPermissions = $role->permissions->pluck('id')->toArray();
                 $role->syncPermissions($validated['permissions']);
-
-                // Audit permission changes
-                foreach ($validated['permissions'] as $permissionId) {
-                    if (!in_array($permissionId, $oldPermissions)) {
-                        RolePermissionsAudit::create([
-                            'role_id' => $role->id,
-                            'permission_id' => $permissionId,
-                            'action' => 'granted',
-                            'performed_by' => Auth::id(),
-                            'reason' => $request->input('reason', 'Role permissions updated via API'),
-                        ]);
-                    }
-                }
-
-                foreach ($oldPermissions as $permissionId) {
-                    if (!in_array($permissionId, $validated['permissions'])) {
-                        RolePermissionsAudit::create([
-                            'role_id' => $role->id,
-                            'permission_id' => $permissionId,
-                            'action' => 'revoked',
-                            'performed_by' => Auth::id(),
-                            'reason' => $request->input('reason', 'Role permissions updated via API'),
-                        ]);
-                    }
-                }
             }
 
             // Update parent roles (hierarchy)
@@ -191,17 +152,6 @@ class RoleController extends Controller
                     }
                 }
             }
-
-            // Audit log
-            RolePermissionsAudit::create([
-                'role_id' => $role->id,
-                'permission_id' => null,
-                'action' => 'updated',
-                'performed_by' => Auth::id(),
-                'reason' => $request->input('reason', 'Role updated via API'),
-                'old_values' => $oldValues,
-                'new_values' => $role->fresh()->toArray(),
-            ]);
 
             DB::commit();
 
@@ -243,16 +193,6 @@ class RoleController extends Controller
 
             $role->delete();
 
-            // Audit log
-            RolePermissionsAudit::create([
-                'role_id' => $role->id,
-                'permission_id' => null,
-                'action' => 'deleted',
-                'performed_by' => Auth::id(),
-                'reason' => 'Role deleted via API',
-                'old_values' => $oldValues,
-            ]);
-
             DB::commit();
 
             return response()->json([
@@ -290,14 +230,7 @@ class RoleController extends Controller
 
             $role->givePermissionTo($permission);
 
-            // Audit log
-            RolePermissionsAudit::create([
-                'role_id' => $role->id,
-                'permission_id' => $permission->id,
-                'action' => 'granted',
-                'performed_by' => Auth::id(),
-                'reason' => $validated['reason'] ?? 'Permission granted via API',
-            ]);
+            $role->givePermissionTo($permission);
 
             return response()->json([
                 'message' => 'Permission granted successfully',
@@ -334,14 +267,7 @@ class RoleController extends Controller
 
             $role->revokePermissionTo($permission);
 
-            // Audit log
-            RolePermissionsAudit::create([
-                'role_id' => $role->id,
-                'permission_id' => $permission->id,
-                'action' => 'revoked',
-                'performed_by' => Auth::id(),
-                'reason' => $validated['reason'] ?? 'Permission revoked via API',
-            ]);
+            $role->revokePermissionTo($permission);
 
             return response()->json([
                 'message' => 'Permission revoked successfully',
@@ -420,41 +346,10 @@ class RoleController extends Controller
     public function hierarchy(): JsonResponse
     {
         $rootRoles = Role::with(['childRoles.childRoles', 'permissions'])
-                         ->root()
-                         ->get();
+            ->root()
+            ->get();
 
         return response()->json(['hierarchy' => $rootRoles]);
     }
 
-    /**
-     * Get role audit logs.
-     */
-    public function auditLogs(Request $request): JsonResponse
-    {
-        $query = RolePermissionsAudit::with(['role', 'permission', 'performedByUser'])
-                                   ->whereNotNull('role_id');
-
-        // Filter by role
-        if ($request->has('role_id')) {
-            $query->where('role_id', $request->role_id);
-        }
-
-        // Filter by action
-        if ($request->has('action')) {
-            $query->byAction($request->action);
-        }
-
-        // Filter by date range
-        if ($request->has('date_from')) {
-            $query->whereDate('created_at', '>=', $request->date_from);
-        }
-        if ($request->has('date_to')) {
-            $query->whereDate('created_at', '<=', $request->date_to);
-        }
-
-        $logs = $query->orderBy('created_at', 'desc')
-                      ->paginate($request->get('per_page', 20));
-
-        return response()->json(['audit_logs' => $logs]);
-    }
 }

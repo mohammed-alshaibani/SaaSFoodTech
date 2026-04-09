@@ -4,7 +4,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\MonitoringController;
 use App\Http\Controllers\ServiceRequestController;
 use App\Http\Controllers\AIController;
 use App\Http\Controllers\AdminController;
@@ -36,9 +35,6 @@ Route::get('/docs/api-docs.yaml', function () {
         'Access-Control-Allow-Origin' => '*'
     ]);
 });
-
-// Simple health check endpoint (outside security middleware)
-Route::get('/health', [MonitoringController::class, 'health']);
 
 // Serve API documentation JSON file (outside security middleware)
 Route::get('/docs/api-docs.json', function () {
@@ -139,9 +135,6 @@ Route::middleware('api-security')->group(function () {
             Route::post('/categories', [PermissionController::class, 'storeCategory'])
                 ->middleware('check.permission:permission.create');
 
-            // Audit logs
-            Route::get('/audit', [PermissionController::class, 'auditLogs'])
-                ->middleware('check.permission:system.logs');
         });
 
         // Role Management Routes
@@ -178,9 +171,6 @@ Route::middleware('api-security')->group(function () {
             Route::delete('/{role}/hierarchy/remove', [RoleController::class, 'removeChildRole'])
                 ->middleware('check.permission:role.hierarchy.manage');
 
-            // Audit logs
-            Route::get('/audit', [RoleController::class, 'auditLogs'])
-                ->middleware('check.permission:system.logs');
         });
 
         // User Permission Management Routes
@@ -218,14 +208,4 @@ Route::middleware('api-security')->group(function () {
         });
     });
 
-    // Monitoring and metrics endpoints
-    Route::prefix('monitoring')->group(function () {
-        Route::get('/dashboard', [MonitoringController::class, 'dashboard']);
-        Route::get('/health', [MonitoringController::class, 'health']);
-        Route::get('/metrics', [MonitoringController::class, 'metrics']);
-        Route::get('/metrics/all', [MonitoringController::class, 'allMetrics']);
-        Route::post('/metrics/record', [MonitoringController::class, 'recordMetric']);
-        Route::post('/metrics/collect', [MonitoringController::class, 'collectSystemMetrics']);
-        Route::post('/metrics/cleanup', [MonitoringController::class, 'cleanup']);
-    });
 });

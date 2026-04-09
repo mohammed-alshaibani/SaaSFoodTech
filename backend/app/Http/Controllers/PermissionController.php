@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\Permission;
 use App\Models\PermissionCategory;
 use App\Models\PermissionScope;
-use App\Models\RolePermissionsAudit;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -19,7 +18,7 @@ class PermissionController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Permission::with(['category', 'scopes']);
+        $query = Permission::with(['category', 'permissionScopes']);
 
         // Filter by category
         if ($request->has('category_id')) {
@@ -45,14 +44,14 @@ class PermissionController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%");
+                    ->orWhere('description', 'like', "%{$search}%");
             });
         }
 
         $permissions = $query->orderBy('category_id')
-                           ->orderBy('group')
-                           ->orderBy('name')
-                           ->paginate($request->get('per_page', 15));
+            ->orderBy('group')
+            ->orderBy('name')
+            ->paginate($request->get('per_page', 15));
 
         return response()->json([
             'permissions' => $permissions,
@@ -92,22 +91,12 @@ class PermissionController extends Controller
             // Create scopes if provided
             if (!empty($validated['scopes'])) {
                 foreach ($validated['scopes'] as $scopeData) {
-                    $permission->scopes()->create([
+                    $permission->permissionScopes()->create([
                         'scope_type' => $scopeData['scope_type'],
                         'scope_values' => $scopeData['scope_values'],
                     ]);
                 }
             }
-
-            // Audit log
-            RolePermissionsAudit::create([
-                'permission_id' => $permission->id,
-                'role_id' => null,
-                'action' => 'created',
-                'performed_by' => Auth::id(),
-                'reason' => 'Permission created via API',
-                'new_values' => $permission->toArray(),
-            ]);
 
             DB::commit();
 
@@ -130,9 +119,7 @@ class PermissionController extends Controller
      */
     public function show(Permission $permission): JsonResponse
     {
-        $permission->load(['category', 'scopes', 'auditRecords' => function ($query) {
-            $query->with('performedByUser')->latest()->limit(50);
-        }]);
+        $permission->load(['category', 'permissionScopes']);
 
         return response()->json(['permission' => $permission]);
     }
@@ -173,25 +160,14 @@ class PermissionController extends Controller
 
             // Update scopes
             if (isset($validated['scopes'])) {
-                $permission->scopes()->delete();
+                $permission->permissionScopes()->delete();
                 foreach ($validated['scopes'] as $scopeData) {
-                    $permission->scopes()->create([
+                    $permission->permissionScopes()->create([
                         'scope_type' => $scopeData['scope_type'],
                         'scope_values' => $scopeData['scope_values'],
                     ]);
                 }
             }
-
-            // Audit log
-            RolePermissionsAudit::create([
-                'permission_id' => $permission->id,
-                'role_id' => null,
-                'action' => 'updated',
-                'performed_by' => Auth::id(),
-                'reason' => $request->input('reason', 'Permission updated via API'),
-                'old_values' => $oldValues,
-                'new_values' => $permission->fresh()->toArray(),
-            ]);
 
             DB::commit();
 
@@ -226,18 +202,8 @@ class PermissionController extends Controller
 
             $oldValues = $permission->toArray();
 
-            $permission->scopes()->delete();
+            $permission->permissionScopes()->delete();
             $permission->delete();
-
-            // Audit log
-            RolePermissionsAudit::create([
-                'permission_id' => $permission->id,
-                'role_id' => null,
-                'action' => 'deleted',
-                'performed_by' => Auth::id(),
-                'reason' => 'Permission deleted via API',
-                'old_values' => $oldValues,
-            ]);
 
             DB::commit();
 
@@ -260,8 +226,8 @@ class PermissionController extends Controller
     public function categories(): JsonResponse
     {
         $categories = PermissionCategory::withCount('permissions')
-                                      ->ordered()
-                                      ->get();
+            ->ordered()
+            ->get();
 
         return response()->json(['categories' => $categories]);
     }
@@ -286,35 +252,4 @@ class PermissionController extends Controller
         ], 201);
     }
 
-    /**
-     * Get permission audit logs.
-     */
-    public function auditLogs(Request $request): JsonResponse
-    {
-        $query = RolePermissionsAudit::with(['permission', 'role', 'performedByUser'])
-                                   ->whereNotNull('permission_id');
-
-        // Filter by permission
-        if ($request->has('permission_id')) {
-            $query->where('permission_id', $request->permission_id);
-        }
-
-        // Filter by action
-        if ($request->has('action')) {
-            $query->byAction($request->action);
-        }
-
-        // Filter by date range
-        if ($request->has('date_from')) {
-            $query->whereDate('created_at', '>=', $request->date_from);
-        }
-        if ($request->has('date_to')) {
-            $query->whereDate('created_at', '<=', $request->date_to);
-        }
-
-        $logs = $query->orderBy('created_at', 'desc')
-                      ->paginate($request->get('per_page', 20));
-
-        return response()->json(['audit_logs' => $logs]);
-    }
 }

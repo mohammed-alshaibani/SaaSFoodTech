@@ -36,17 +36,9 @@ class Permission extends SpatiePermission
     /**
      * Get the permission scopes for the permission.
      */
-    public function scopes(): HasMany
+    public function permissionScopes(): HasMany
     {
         return $this->hasMany(PermissionScope::class);
-    }
-
-    /**
-     * Get the audit records for the permission.
-     */
-    public function auditRecords(): HasMany
-    {
-        return $this->hasMany(RolePermissionsAudit::class, 'permission_id');
     }
 
     /**
@@ -86,7 +78,7 @@ class Permission extends SpatiePermission
      */
     public function isScoped(): bool
     {
-        return $this->scopes()->exists();
+        return $this->permissionScopes()->exists();
     }
 
     /**
@@ -96,9 +88,9 @@ class Permission extends SpatiePermission
     {
         $array = parent::toArray();
         $array['category'] = $this->category;
-        $array['scopes'] = $this->scopes;
+        $array['scopes'] = $this->permissionScopes;
         $array['is_scoped'] = $this->isScoped();
-        
+
         return $array;
     }
 }

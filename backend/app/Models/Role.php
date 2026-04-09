@@ -34,14 +34,6 @@ class Role extends SpatieRole
     }
 
     /**
-     * Get the audit records for the role.
-     */
-    public function auditRecords(): HasMany
-    {
-        return $this->hasMany(RolePermissionsAudit::class, 'role_id');
-    }
-
-    /**
      * Get all permissions including inherited from parent roles.
      */
     public function getAllPermissions(): \Illuminate\Support\Collection
