@@ -53,10 +53,10 @@ export default function LoginForm() {
 
     try {
       const result = await login(formData);
-      
+
       if (result.success) {
         const dashboardPath = getDashboardPath();
-        router.push(dashboardPath);
+        router.push(dashboardPath || '/dashboard/customer');
       } else {
         setErrors({ general: result.error });
       }

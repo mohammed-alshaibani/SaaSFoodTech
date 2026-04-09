@@ -8,7 +8,7 @@ import { Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function RegisterForm() {
-  const router = useRouter(); // Initialize router
+  const router = useRouter(); // Initialize router (cache busted)
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -106,9 +106,21 @@ export default function RegisterForm() {
 
       // Backend returns access_token
       const { access_token, user } = data;
-      const { dashboardPath } = await login(access_token, user);
+      const result = await login({ email: user.email, password: null, access_token });
 
-      router.push(dashboardPath);
+      if (result.success) {
+        // Redirect based on user role
+        const role = user.roles?.[0] || 'customer';
+        const dashboardPaths = {
+          admin: '/dashboard/admin',
+          customer: '/dashboard/customer',
+          provider_admin: '/dashboard/provider',
+          provider_employee: '/dashboard/provider'
+        };
+        router.push(dashboardPaths[role] || '/dashboard/customer');
+      } else {
+        throw new Error(result.error || 'Login failed after registration');
+      }
     } catch (error) {
       setErrors({ general: error.message });
     }

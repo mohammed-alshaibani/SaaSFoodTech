@@ -24,6 +24,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'rate.limit.plan' => \App\Http\Middleware\RateLimitByPlan::class,
         ]);
 
+        // Apply CORS to API routes
+        $middleware->group('api', [
+            \Illuminate\Http\Middleware\HandleCors::class,
+        ]);
+
         // Apply security middleware to all API routes
         $middleware->group('api-security', [
             \App\Http\Middleware\ApiSecurityMiddleware::class,
@@ -31,6 +36,8 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withProviders([
+        \App\Providers\AuthServiceProvider::class,
+        \App\Providers\EventServiceProvider::class,
         \App\Providers\StrategyServiceProvider::class,
     ])
     ->withExceptions(function (Exceptions $exceptions) {

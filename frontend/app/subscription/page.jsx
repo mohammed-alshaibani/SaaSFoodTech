@@ -15,6 +15,13 @@ export default function SubscriptionPage() {
     const { plans, usage, loading: subscriptionLoading, upgradePlan } = useSubscription();
     const router = useRouter();
 
+    const displayPlans = (plans || [])
+        .filter(plan => ['free', 'premium'].includes(plan.name))
+        .map(plan => ({
+            ...plan,
+            display_name: plan.name === 'free' ? 'الفئة المجانية' : 'فئة المحترفين (Pro)'
+        }));
+
     useEffect(() => {
         if (!loading && !user) {
             router.push('/login');
@@ -24,7 +31,7 @@ export default function SubscriptionPage() {
 
     const handleUpgrade = async (planName) => {
         const result = await upgradePlan(planName);
-        
+
         if (result.success) {
             alert('Plan upgraded successfully!');
         } else {
@@ -43,13 +50,14 @@ export default function SubscriptionPage() {
     return (
         <div className="min-h-screen bg-gray-50 py-12">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                {/* Header */}
-                <div className="text-center mb-12">
-                    <h1 className="text-4xl font-bold text-gray-900 mb-4">
-                        Manage Your Subscription
+                {/* Header built around the 'Pricing.jsx' aesthetic */}
+                <div className="text-center mb-16 space-y-4 relative z-10">
+                    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-500/5 rounded-full blur-[100px] -z-10" />
+                    <h1 className="text-3xl md:text-5xl font-bold text-gray-900 tracking-tight pt-8 mb-4">
+                        Transparent Scaling <span className="text-blue-500 underline decoration-blue-500/10 underline-offset-4 decoration-8">Strategy</span>.
                     </h1>
-                    <p className="text-xl text-gray-600">
-                        Upgrade your plan to unlock more features and higher limits
+                    <p className="text-gray-500 font-medium max-w-xl mx-auto leading-relaxed">
+                        No complicated contracts. Choose a plan that suits your current marketplace volume and upgrade as you grow.
                     </p>
                 </div>
 
@@ -63,81 +71,13 @@ export default function SubscriptionPage() {
                     </div>
                 </div>
 
-                {/* Available Plans */}
-                <div className="mb-12">
-                    <h2 className="text-2xl font-bold text-gray-900 mb-8 text-center">
-                        Available Plans
-                    </h2>
-                    <SubscriptionPlans 
-                        plans={plans} 
+                {/* Available Plans Component inheriting Pricing UI */}
+                <div className="mt-16">
+                    <SubscriptionPlans
+                        plans={displayPlans}
                         currentPlan={usage?.current_plan}
                         onUpgrade={handleUpgrade}
                     />
-                </div>
-
-                {/* Feature Comparison */}
-                <div className="bg-white rounded-lg shadow-sm border p-8">
-                    <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">
-                        Feature Comparison
-                    </h2>
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Feature
-                                    </th>
-                                    {plans.map((plan) => (
-                                        <th key={plan.name} className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            {plan.display_name}
-                                        </th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                                <tr>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                        Monthly Requests
-                                    </td>
-                                    {plans.map((plan) => (
-                                        <td key={plan.name} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
-                                            {plan.limits.requests_per_month}
-                                        </td>
-                                    ))}
-                                </tr>
-                                <tr>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                        Attachments per Request
-                                    </td>
-                                    {plans.map((plan) => (
-                                        <td key={plan.name} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
-                                            {plan.limits.attachments_per_request}
-                                        </td>
-                                    ))}
-                                </tr>
-                                <tr>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                        AI Enhancement
-                                    </td>
-                                    {plans.map((plan) => (
-                                        <td key={plan.name} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
-                                            {plan.features.ai_enhancement ? 'Yes' : 'No'}
-                                        </td>
-                                    ))}
-                                </tr>
-                                <tr>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                        Priority Support
-                                    </td>
-                                    {plans.map((plan) => (
-                                        <td key={plan.name} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
-                                            {plan.features.priority_support ? 'Yes' : 'No'}
-                                        </td>
-                                    ))}
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
                 </div>
             </div>
         </div>

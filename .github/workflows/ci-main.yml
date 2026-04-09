@@ -1,0 +1,16 @@
+name: Main CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  call-reusable-ci:
+    uses: ./.github/workflows/ci-reusable.yml
+    with:
+      node-version: '18'
+      php-version: '8.2'
+    secrets:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

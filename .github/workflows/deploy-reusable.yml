@@ -1,30 +1,39 @@
-name: Deploy to Production
+name: Reusable Deployment Pipeline
 
 on:
-  push:
-    branches: [ main ]
-    tags: [ 'v*' ]
-  workflow_dispatch:
+  workflow_call:
     inputs:
       environment:
         description: 'Deployment environment'
-        required: true
-        default: 'production'
-        type: choice
-        options:
-          - staging
-          - production
+        required: false
+        default: 'staging'
+        type: string
+      docker-registry:
+        description: 'Docker registry'
+        required: false
+        default: 'docker.io'
+        type: string
+      backend-image:
+        description: 'Backend image name'
+        required: false
+        default: 'saas-foodtech-backend'
+        type: string
+      frontend-image:
+        description: 'Frontend image name'
+        required: false
+        default: 'saas-foodtech-frontend'
+        type: string
 
 env:
-  REGISTRY: docker.io
-  BACKEND_IMAGE: saas-foodtech-backend
-  FRONTEND_IMAGE: saas-foodtech-frontend
+  REGISTRY: ${{ inputs.docker-registry }}
+  BACKEND_IMAGE: ${{ inputs.backend-image }}
+  FRONTEND_IMAGE: ${{ inputs.frontend-image }}
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
-    environment: ${{ github.event.inputs.environment || 'production' }}
+    environment: ${{ inputs.environment }}
     
     steps:
       - name: Checkout code
@@ -91,7 +100,7 @@ jobs:
             export FRONTEND_IMAGE=${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:$VERSION
             export GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
             
-            echo "🚀 Starting deployment of version $VERSION"
+            echo "Deploying version $VERSION to ${{ inputs.environment }}"
             
             # Create deployment directory if it doesn't exist
             mkdir -p /opt/saas-foodtech
@@ -99,7 +108,7 @@ jobs:
             
             # Download latest docker-compose if not exists
             if [ ! -f "docker-compose.prod.yml" ]; then
-              echo "📥 Downloading production docker-compose file..."
+              echo "Downloading production docker-compose file..."
               curl -o docker-compose.prod.yml https://raw.githubusercontent.com/${{ github.repository }}/main/docker-compose.prod.yml
             fi
             
@@ -108,7 +117,7 @@ jobs:
             sed -i "s|yourusername/saas-foodtech-frontend:latest|$FRONTEND_IMAGE|g" docker-compose.prod.yml
             
             # Create/update .env file for production
-            cat > .env << EOF
+            cat > .env << 'EOF'
 APP_NAME="FoodTech SAAS Platform"
 APP_ENV=production
 APP_KEY=${{ secrets.APP_KEY }}
@@ -117,27 +126,22 @@ APP_DEBUG=false
 APP_TIMEZONE=UTC
 APP_URL=${{ secrets.APP_URL }}
 FRONTEND_URL=${{ secrets.FRONTEND_URL }}
-
 DB_CONNECTION=mysql
 DB_HOST=mysql
 DB_PORT=3306
 DB_DATABASE=otex_platform
 DB_USERNAME=${{ secrets.DB_USERNAME }}
 DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-
 SESSION_DRIVER=database
 SESSION_LIFETIME=120
 AUTH_API_DRIVER=sanctum
-
 BROADCAST_CONNECTION=reverb
 FILESYSTEM_DISK=local
 QUEUE_CONNECTION=redis
 CACHE_DRIVER=redis
 CACHE_PREFIX=foodtech_
-
 REDIS_HOST=redis
 REDIS_PORT=6379
-
 MAIL_MAILER=smtp
 MAIL_HOST=${{ secrets.MAIL_HOST }}
 MAIL_PORT=${{ secrets.MAIL_PORT }}
@@ -146,15 +150,12 @@ MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
 MAIL_ENCRYPTION=${{ secrets.MAIL_ENCRYPTION }}
 MAIL_FROM_ADDRESS="${{ secrets.MAIL_FROM_ADDRESS }}"
 MAIL_FROM_NAME="${APP_NAME}"
-
 REVERB_APP_ID=${{ secrets.REVERB_APP_ID }}
 REVERB_APP_KEY=${{ secrets.REVERB_APP_KEY }}
 REVERB_APP_SECRET=${{ secrets.REVERB_APP_SECRET }}
 REVERB_HOST=reverb
 REVERB_PORT=8080
 REVERB_SCHEME=http
-
-# Google Gemini AI
 GEMINI_API_KEY=$GEMINI_API_KEY
 GEMINI_MODEL=gemini-1.5-flash
 GEMINI_REQUEST_TIMEOUT=30
@@ -163,41 +164,41 @@ GEMINI_TEMPERATURE=0.7
 EOF
             
             # Pull latest images
-            echo "📥 Pulling Docker images..."
+            echo "Pulling Docker images..."
             docker-compose -f docker-compose.prod.yml pull
             
             # Stop existing containers
-            echo "🛑 Stopping existing containers..."
+            echo "Stopping existing containers..."
             docker-compose -f docker-compose.prod.yml down
             
             # Start new containers
-            echo "🔄 Starting new containers..."
+            echo "Starting new containers..."
             docker-compose -f docker-compose.prod.yml up -d
             
             # Wait for services to be healthy
-            echo "⏳ Waiting for services to be healthy..."
+            echo "Waiting for services to be healthy..."
             sleep 30
             
             # Run database migrations
-            echo "🗄️ Running database migrations..."
+            echo "Running database migrations..."
             docker-compose -f docker-compose.prod.yml exec -T backend php artisan migrate --force
             
             # Clear caches
-            echo "🧹 Clearing application caches..."
+            echo "Clearing application caches..."
             docker-compose -f docker-compose.prod.yml exec -T backend php artisan config:cache
             docker-compose -f docker-compose.prod.yml exec -T backend php artisan route:cache
             docker-compose -f docker-compose.prod.yml exec -T backend php artisan view:cache
             
             # Cleanup old images
-            echo "🧹 Cleaning up old Docker images..."
+            echo "Cleaning up old Docker images..."
             docker image prune -f
             
-            echo "✅ Deployment completed successfully!"
-            echo "🌐 Application should be available at: ${{ secrets.APP_URL }}"
+            echo "Deployment completed successfully!"
+            echo "Application should be available at: ${{ secrets.APP_URL }}"
 
       - name: Health Check
         run: |
-          echo "🏥 Running health checks..."
+          echo "Running health checks..."
           sleep 60
           
           # Check backend health
@@ -210,57 +211,25 @@ EOF
           echo "Frontend Status: $FRONTEND_STATUS"
           
           if [ "$BACKEND_STATUS" = "200" ] && [ "$FRONTEND_STATUS" = "200" ]; then
-            echo "✅ All services are healthy!"
+            echo "All services are healthy!"
           else
-            echo "❌ Health check failed!"
+            echo "Health check failed!"
             exit 1
           fi
 
-      - name: Notify Slack
+      - name: Notify Deployment Status
         if: always()
-        uses: 8398a7/action-slack@v3
-        with:
-          status: ${{ job.status }}
-          channel: '#deployments'
-          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
-          fields: repo,message,commit,author,action,eventName,ref,workflow
-
-  rollback:
-    runs-on: ubuntu-latest
-    if: failure() && github.ref == 'refs/heads/main'
-    needs: deploy
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Rollback Deployment
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.PROD_HOST }}
-          username: ${{ secrets.PROD_USER }}
-          key: ${{ secrets.PROD_SSH_KEY }}
-          script: |
-            echo "🔄 Rolling back deployment..."
-            cd /opt/saas-foodtech
-            
-            # Get previous working version tag
-            PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "v1.0.0")
-            
-            if [ "$PREVIOUS_TAG" = "" ]; then
-              echo "❌ No previous version found for rollback"
-              exit 1
-            fi
-            
-            echo "🔄 Rolling back to version: $PREVIOUS_TAG"
-            
-            # Update docker-compose with previous version
-            sed -i "s|yourusername/saas-foodtech-backend:.*|yourusername/saas-foodtech-backend:$PREVIOUS_TAG|g" docker-compose.prod.yml
-            sed -i "s|yourusername/saas-foodtech-frontend:.*|yourusername/saas-foodtech-frontend:$PREVIOUS_TAG|g" docker-compose.prod.yml
-            
-            # Deploy previous version
-            docker-compose -f docker-compose.prod.yml down
-            docker-compose -f docker-compose.prod.yml pull
-            docker-compose -f docker-compose.prod.yml up -d
-            
-            echo "✅ Rollback to $PREVIOUS_TAG completed!"
+        run: |
+          echo "## Deployment Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Environment: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "Version: ${{ steps.meta.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "Status: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "### Deployment Successful! " >> $GITHUB_STEP_SUMMARY
+            echo "Application is now live at: ${{ secrets.APP_URL }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### Deployment Failed!" >> $GITHUB_STEP_SUMMARY
+            echo "Please check the logs for details." >> $GITHUB_STEP_SUMMARY
+          fi

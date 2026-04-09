@@ -1,9 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { CheckCircle2, XCircle } from 'lucide-react';
+import { useI18n } from '@/context/I18nContext';
 
 export default function SubscriptionPlans({ plans, currentPlan, onUpgrade }) {
     const [loading, setLoading] = useState(null);
+    const { t } = useI18n();
 
     const handleUpgradeClick = async (planName) => {
         setLoading(planName);
@@ -14,128 +17,85 @@ export default function SubscriptionPlans({ plans, currentPlan, onUpgrade }) {
         }
     };
 
-    const getPlanColor = (planName) => {
-        switch (planName) {
-            case 'free':
-                return 'border-gray-300 bg-gray-50';
-            case 'basic':
-                return 'border-blue-300 bg-blue-50';
-            case 'premium':
-                return 'border-purple-300 bg-purple-50';
-            case 'enterprise':
-                return 'border-yellow-300 bg-yellow-50';
-            default:
-                return 'border-gray-300 bg-gray-50';
-        }
-    };
-
-    const getPlanButtonColor = (planName) => {
-        switch (planName) {
-            case 'free':
-                return 'bg-gray-600 hover:bg-gray-700';
-            case 'basic':
-                return 'bg-blue-600 hover:bg-blue-700';
-            case 'premium':
-                return 'bg-purple-600 hover:bg-purple-700';
-            case 'enterprise':
-                return 'bg-yellow-600 hover:bg-yellow-700';
-            default:
-                return 'bg-gray-600 hover:bg-gray-700';
-        }
-    };
-
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto relative z-10 w-full pb-8">
             {plans.map((plan) => {
                 const isCurrentPlan = plan.name === currentPlan;
                 const canUpgrade = !isCurrentPlan && plan.name !== 'free';
-                
+                const isPopular = plan.name === 'premium' || plan.name === 'pro';
+
+                // Extract features for the modern SaaS aesthetic 
+                const features = [
+                    { name: `Up to ${plan.limits.requests_per_month === 'unlimited' ? 'Unlimited' : plan.limits.requests_per_month} Service Requests`, active: true },
+                    { name: `${plan.limits.attachments_per_request} Attachments per Request`, active: true },
+                    { name: "AI Description Enhancement", active: !!plan.features.ai_enhancement },
+                    { name: "Priority Provider Support", active: !!plan.features.priority_support },
+                    { name: "Advanced API Access", active: !!plan.features.api_access },
+                ];
+
                 return (
                     <div
-                        key={plan.id}
-                        className={`relative rounded-lg border-2 p-6 ${getPlanColor(plan.name)} ${
-                            isCurrentPlan ? 'ring-2 ring-offset-2 ring-blue-500' : ''
-                        }`}
+                        key={plan.name}
+                        className={`p-10 rounded-[2.5rem] border bg-white relative shadow-xl flex flex-col h-full transform transition-all hover:scale-[1.02] ${isPopular ? 'border-blue-600 ring-2 ring-blue-600/5 shadow-blue-500/10' : 'border-gray-100 shadow-slate-200/50'
+                            } ${isCurrentPlan ? 'opacity-95 ring-2 ring-emerald-500/10' : ''}`}
                     >
+                        {isPopular && (
+                            <div className="absolute -top-4 left-10 py-1.5 px-4 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-full shadow-lg shadow-blue-600/20">
+                                {t('pricing.mostPopular') || 'Most Popular'}
+                            </div>
+                        )}
                         {isCurrentPlan && (
-                            <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2">
-                                <span className="bg-blue-500 text-white text-xs font-bold px-3 py-1 rounded-full">
-                                    CURRENT
-                                </span>
+                            <div className="absolute -top-4 right-10 py-1.5 px-4 bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest rounded-full shadow-lg shadow-emerald-500/20">
+                                Current Plan
                             </div>
                         )}
 
-                        <div className="text-center mb-6">
-                            <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                                {plan.display_name}
-                            </h3>
-                            <div className="text-4xl font-bold text-gray-900 mb-2">
-                                {plan.formatted_price}
-                                <span className="text-lg font-normal text-gray-500">
-                                    /{plan.billing_cycle}
+                        <div className="mb-10">
+                            <h3 className="text-2xl font-black text-gray-900 mb-2">{plan.display_name}</h3>
+                            <p className="text-sm text-gray-400 font-bold mb-8 uppercase tracking-widest leading-none">
+                                Starting at
+                            </p>
+                            <div className="flex items-baseline gap-1">
+                                <span className="text-5xl font-black text-gray-900 leading-none">
+                                    {plan.formatted_price || `$${plan.price || '0'}`}
                                 </span>
+                                <span className="text-gray-400 font-medium tracking-tight">/mo</span>
                             </div>
-                            <p className="text-sm text-gray-600">
+                            <p className="text-sm text-gray-500 font-medium mt-6 leading-relaxed">
                                 {plan.description}
                             </p>
                         </div>
 
-                        <div className="space-y-3 mb-8">
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm text-gray-600">Monthly Requests</span>
-                                <span className="text-sm font-semibold text-gray-900">
-                                    {plan.limits.requests_per_month}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm text-gray-600">Attachments per Request</span>
-                                <span className="text-sm font-semibold text-gray-900">
-                                    {plan.limits.attachments_per_request}
-                                </span>
-                            </div>
-                            {plan.features.ai_enhancement && (
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm text-gray-600">AI Enhancement</span>
-                                    <span className="text-sm font-semibold text-green-600">Yes</span>
+                        <div className="space-y-4 mb-12 flex-grow">
+                            {features.map(f => (
+                                <div key={f.name} className="flex items-center gap-3">
+                                    <div className={f.active ? 'text-blue-600' : 'text-slate-200'}>
+                                        {f.active ? <CheckCircle2 size={18} strokeWidth={3} /> : <XCircle size={18} strokeWidth={2} />}
+                                    </div>
+                                    <span className={`text-[13px] font-bold tracking-tight ${f.active ? 'text-gray-700' : 'text-slate-300'}`}>
+                                        {f.name}
+                                    </span>
                                 </div>
-                            )}
-                            {plan.features.priority_support && (
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm text-gray-600">Priority Support</span>
-                                    <span className="text-sm font-semibold text-green-600">Yes</span>
-                                </div>
-                            )}
-                            {plan.features.api_access && (
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm text-gray-600">API Access</span>
-                                    <span className="text-sm font-semibold text-green-600">Yes</span>
-                                </div>
-                            )}
+                            ))}
                         </div>
 
                         <button
                             onClick={() => handleUpgradeClick(plan.name)}
-                            disabled={!canUpgrade || loading !== null}
-                            className={`w-full py-3 px-4 rounded-md text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                                isCurrentPlan
-                                    ? 'bg-gray-400 cursor-not-allowed'
-                                    : canUpgrade
-                                    ? getPlanButtonColor(plan.name)
-                                    : 'bg-gray-400 cursor-not-allowed'
-                            }`}
+                            disabled={!canUpgrade || loading === plan.name}
+                            className={`w-full py-4 rounded-2xl text-sm font-black transition-all shadow-lg active:scale-[0.98] text-center ${isCurrentPlan
+                                    ? 'bg-slate-100 text-gray-400 cursor-not-allowed shadow-none'
+                                    : isPopular
+                                        ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-600/10'
+                                        : 'bg-slate-100 text-gray-800 hover:bg-slate-200 shadow-slate-200/50'
+                                }`}
                         >
-                            {loading === plan.name ? (
-                                <div className="flex items-center justify-center">
-                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                                    Processing...
-                                </div>
-                            ) : isCurrentPlan ? (
-                                'Current Plan'
-                            ) : plan.name === 'free' ? (
-                                'Downgrade'
-                            ) : (
-                                'Upgrade'
-                            )}
+                            {loading === plan.name
+                                ? 'Processing...'
+                                : isCurrentPlan
+                                    ? 'Current Plan'
+                                    : plan.name === 'free'
+                                        ? 'Downgrade'
+                                        : 'Upgrade to Pro'}
                         </button>
                     </div>
                 );

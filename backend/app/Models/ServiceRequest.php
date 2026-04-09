@@ -5,10 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Traits\HasFileUploads;
+use App\Traits\HasGeolocation;
 
 class ServiceRequest extends Model
 {
-    use HasFactory;
+    use HasFactory, HasFileUploads, HasGeolocation;
     protected $fillable = [
         'customer_id',
         'provider_id',
