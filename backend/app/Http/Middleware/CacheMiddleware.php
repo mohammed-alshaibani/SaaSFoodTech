@@ -2,29 +2,22 @@
 
 namespace App\Http\Middleware;
 
-use App\Services\Cache\CacheService;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Cache;
 use Symfony\Component\HttpFoundation\Response;
 
 class CacheMiddleware
 {
-    protected CacheService $cacheService;
-    protected array $cacheConfig;
-
-    public function __construct(CacheService $cacheService)
-    {
-        $this->cacheService = $cacheService;
-        $this->cacheConfig = [
-            // Routes to cache with TTL in seconds
-            'GET:/api/requests' => 300, // 5 minutes
-            'GET:/api/me' => 1800, // 30 minutes
-            'GET:/api/users' => 600, // 10 minutes
-            'GET:/api/statistics' => 900, // 15 minutes
-            'GET:/api/analytics' => 1800, // 30 minutes
-        ];
-    }
+    protected array $cacheConfig = [
+        // Routes to cache with TTL in seconds
+        'GET:/api/requests' => 300, // 5 minutes
+        'GET:/api/me' => 1800, // 30 minutes
+        'GET:/api/users' => 600, // 10 minutes
+        'GET:/api/statistics' => 900, // 15 minutes
+        'GET:/api/analytics' => 1800, // 30 minutes
+    ];
 
     /**
      * Handle an incoming request.
@@ -40,7 +33,7 @@ class CacheMiddleware
         $ttl = $this->getCacheTtl($request);
 
         // Check if response is cached
-        if ($cachedResponse = $this->cacheService->get($cacheKey)) {
+        if ($cachedResponse = Cache::get($cacheKey)) {
             return response()->json($cachedResponse)
                 ->header('X-Cache', 'HIT')
                 ->header('X-Cache-TTL', $ttl);
@@ -52,7 +45,7 @@ class CacheMiddleware
         // Cache successful responses
         if ($this->shouldCacheResponse($response) && $ttl > 0) {
             $responseData = json_decode($response->getContent(), true);
-            $this->cacheService->set($cacheKey, $responseData, $ttl);
+            Cache::put($cacheKey, $responseData, $ttl);
         }
 
         return $response
@@ -116,8 +109,6 @@ class CacheMiddleware
      */
     public static function invalidate(array $patterns): void
     {
-        $cacheService = app(CacheService::class);
-
         foreach ($patterns as $pattern) {
             // For Redis, we can use pattern matching
             if (config('cache.default') === 'redis') {
@@ -129,7 +120,7 @@ class CacheMiddleware
                 }
             } else {
                 // For other cache drivers, clear all cache
-                $cacheService->clear();
+                Cache::flush();
             }
         }
     }
