@@ -30,7 +30,7 @@ class PaymentProcessorFactory
         $processorClass = self::getProcessorClass($name);
         if ($processorClass && class_exists($processorClass)) {
             $processor = App::make($processorClass);
-            
+
             if ($processor instanceof PaymentProcessorInterface && $processor->isAvailable()) {
                 self::$processors[$name] = $processor;
                 return $processor;
@@ -50,7 +50,8 @@ class PaymentProcessorFactory
      */
     public static function getDefault(): ?PaymentProcessorInterface
     {
-        $default = config('payment.default_processor', 'stripe');
+        // Changed default fallback to 'mock'
+        $default = config('payment.default_processor', 'mock');
         return self::get($default);
     }
 
@@ -88,6 +89,7 @@ class PaymentProcessorFactory
         return [
             'stripe' => StripePaymentProcessor::class,
             'paypal' => PayPalPaymentProcessor::class,
+            'mock' => MockPaymentProcessor::class,
         ];
     }
 

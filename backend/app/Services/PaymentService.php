@@ -22,8 +22,8 @@ class PaymentService
      */
     public function processPayment(UpgradePlanRequest $request): bool
     {
-        $paymentMethod = $request->payment_method ?? 'stripe';
-        $processor = $this->factory->get($paymentMethod);
+        $paymentMethod = $request->payment_method ?? $this->factory->getDefault()->getName();
+        $processor = $this->factory->get($paymentMethod) ?? $this->factory->getDefault();
 
         if (!$processor) {
             Log::error('Payment processor not found', [
@@ -56,7 +56,7 @@ class PaymentService
      */
     public function createPaymentIntent(array $data, ?string $paymentMethod = null): array
     {
-        $paymentMethod = $paymentMethod ?? 'stripe';
+        $paymentMethod = $paymentMethod ?? $this->factory->getDefault()->getName();
         $processor = $this->factory->get($paymentMethod);
 
         if (!$processor) {
@@ -71,7 +71,7 @@ class PaymentService
      */
     public function confirmPayment(string $paymentIntentId, ?string $paymentMethod = null): bool
     {
-        $paymentMethod = $paymentMethod ?? 'stripe';
+        $paymentMethod = $paymentMethod ?? $this->factory->getDefault()->getName();
         $processor = $this->factory->get($paymentMethod);
 
         if (!$processor) {
@@ -109,7 +109,7 @@ class PaymentService
      */
     public function refundPayment(string $transactionId, ?string $reason = null, ?string $paymentMethod = null): bool
     {
-        $paymentMethod = $paymentMethod ?? 'stripe';
+        $paymentMethod = $paymentMethod ?? $this->factory->getDefault()->getName();
         $processor = $this->factory->get($paymentMethod);
 
         if (!$processor) {
@@ -124,7 +124,7 @@ class PaymentService
      */
     public function updatePaymentMethod(UserSubscription $subscription, array $paymentMethodData): bool
     {
-        $paymentMethod = $paymentMethodData['processor'] ?? 'stripe';
+        $paymentMethod = $paymentMethodData['processor'] ?? $this->factory->getDefault()->getName();
         $processor = $this->factory->get($paymentMethod);
 
         if (!$processor) {
