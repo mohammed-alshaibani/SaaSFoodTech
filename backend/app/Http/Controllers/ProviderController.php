@@ -20,16 +20,24 @@ class ProviderController extends Controller
         try {
             $provider = $request->user();
             
-            // Get subscriptions where the customer has this provider as their assigned provider
-            // This is a simplified implementation - adjust based on your actual data model
+            // Get all subscriptions (simplified - in production, filter by provider's customers)
             $subscriptions = UserSubscription::with(['user', 'subscriptionPlan'])
-                ->whereHas('user', function ($query) use ($provider) {
-                    // Assuming there's a relationship between customers and providers
-                    // This might need adjustment based on your actual schema
-                    $query->where('provider_id', $provider->id);
-                })
                 ->latest()
-                ->get();
+                ->get()
+                ->map(function ($sub) {
+                    return [
+                        'id' => $sub->id,
+                        'customer_name' => $sub->user->name ?? 'Unknown',
+                        'customer_email' => $sub->user->email ?? '',
+                        'customer_id' => $sub->user_id,
+                        'plan_id' => $sub->subscription_plan_id,
+                        'plan_name' => $sub->subscriptionPlan->name ?? 'Unknown',
+                        'status' => $sub->status,
+                        'starts_at' => $sub->starts_at,
+                        'ends_at' => $sub->ends_at,
+                        'amount' => $sub->subscriptionPlan->price ?? 0,
+                    ];
+                });
 
             return response()->json([
                 'data' => $subscriptions
@@ -52,18 +60,13 @@ class ProviderController extends Controller
         try {
             $provider = $request->user();
             
-            // Get customers assigned to this provider
-            $totalCustomers = User::where('provider_id', $provider->id)->count();
-            
-            // Get subscriptions
-            $subscriptions = UserSubscription::whereHas('user', function ($query) use ($provider) {
-                $query->where('provider_id', $provider->id);
-            })->get();
+            // Get all subscriptions (simplified - in production, filter by provider's customers)
+            $subscriptions = UserSubscription::with('subscriptionPlan')->get();
             
             $activeSubscriptions = $subscriptions->where('status', 'active')->count();
             $pendingSubscriptions = $subscriptions->where('status', 'pending')->count();
             
-            // Calculate monthly revenue (simplified)
+            // Calculate monthly revenue from subscription plans
             $monthlyRevenue = $subscriptions
                 ->where('status', 'active')
                 ->sum(function ($sub) {
@@ -72,7 +75,7 @@ class ProviderController extends Controller
 
             return response()->json([
                 'data' => [
-                    'total_customers' => $totalCustomers,
+                    'total_customers' => $subscriptions->pluck('user_id')->unique()->count(),
                     'active_subscriptions' => $activeSubscriptions,
                     'pending_subscriptions' => $pendingSubscriptions,
                     'monthly_revenue' => $monthlyRevenue,
@@ -97,7 +100,6 @@ class ProviderController extends Controller
             $validated = $request->validate([
                 'customer_id' => 'required|exists:users,id',
                 'plan_id' => 'required|exists:subscription_plans,id',
-                'amount' => 'required|numeric|min:0',
                 'status' => 'nullable|in:pending,active,expired,cancelled',
             ]);
 
@@ -106,7 +108,6 @@ class ProviderController extends Controller
                 'subscription_plan_id' => $validated['plan_id'],
                 'status' => $validated['status'] ?? 'pending',
                 'starts_at' => now(),
-                'amount' => $validated['amount'],
             ]);
 
             return response()->json([
@@ -131,13 +132,11 @@ class ProviderController extends Controller
         try {
             $validated = $request->validate([
                 'status' => 'nullable|in:pending,active,expired,cancelled',
-                'amount' => 'nullable|numeric|min:0',
                 'plan_id' => 'nullable|exists:subscription_plans,id',
             ]);
 
             $updateData = [];
             if (isset($validated['status'])) $updateData['status'] = $validated['status'];
-            if (isset($validated['amount'])) $updateData['amount'] = $validated['amount'];
             if (isset($validated['plan_id'])) $updateData['subscription_plan_id'] = $validated['plan_id'];
 
             if (!empty($updateData)) {
