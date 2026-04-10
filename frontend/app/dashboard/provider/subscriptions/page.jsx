@@ -35,7 +35,7 @@ export default function ProviderSubscriptionsPage() {
     const [message, setMessage] = useState(null);
     const [showModal, setShowModal] = useState(false);
     const [editingSubscription, setEditingSubscription] = useState(null);
-    const [formData, setFormData] = useState({ customer_id: '', plan_id: '', amount: '', status: 'pending' });
+    const [formData, setFormData] = useState({ customer_id: '', plan_id: '', status: 'pending' });
 
     const fetchSubscriptions = useCallback(async () => {
         try {
@@ -81,7 +81,6 @@ export default function ProviderSubscriptionsPage() {
         setFormData({ 
             customer_id: subscription.customer_id || '', 
             plan_id: subscription.plan_id || '', 
-            amount: subscription.amount || '', 
             status: subscription.status || 'pending' 
         });
         setShowModal(true);
@@ -102,7 +101,7 @@ export default function ProviderSubscriptionsPage() {
     const closeModal = () => {
         setShowModal(false);
         setEditingSubscription(null);
-        setFormData({ customer_id: '', plan_id: '', amount: '', status: 'pending' });
+        setFormData({ customer_id: '', plan_id: '', status: 'pending' });
     };
 
     useEffect(() => {
@@ -401,17 +400,6 @@ export default function ProviderSubscriptionsPage() {
                                         <option value="premium">{t('subscriptions.premium') || 'Premium'}</option>
                                         <option value="enterprise">{t('subscriptions.enterprise') || 'Enterprise'}</option>
                                     </select>
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">{t('subscriptions.amount') || 'Amount'}</label>
-                                    <input
-                                        type="number"
-                                        value={formData.amount}
-                                        onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                                        placeholder="0.00"
-                                        className="w-full bg-white border border-gray-200 rounded-2xl px-6 py-4 text-sm font-bold text-gray-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
-                                        required
-                                    />
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">{t('subscriptions.status') || 'Status'}</label>
