@@ -10,52 +10,11 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\ProviderController;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
 use App\Http\Requests\StoreServiceRequestRequest;
 use App\Http\Requests\UpdateServiceRequestRequest;
-
-// Serve API documentation YAML file (outside security middleware)
-Route::get('/docs/api-docs.yaml', function () {
-    $yamlPath = storage_path('api-docs/api-docs.yaml');
-
-    if (!file_exists($yamlPath)) {
-        // Try the alternative location
-        $yamlPath = storage_path('api-docs.yaml');
-        if (!file_exists($yamlPath)) {
-            return response()->json([
-                'error' => 'API documentation not found',
-                'message' => 'Please generate the documentation first'
-            ], 404);
-        }
-    }
-
-    return response()->file($yamlPath, [
-        'Content-Type' => 'application/x-yaml',
-        'Access-Control-Allow-Origin' => '*'
-    ]);
-});
-
-// Serve API documentation JSON file (outside security middleware)
-Route::get('/docs/api-docs.json', function () {
-    $yamlPath = storage_path('api-docs/api-docs.yaml');
-
-    if (!file_exists($yamlPath)) {
-        $yamlPath = storage_path('api-docs.yaml');
-        if (!file_exists($yamlPath)) {
-            return response()->json([
-                'error' => 'API documentation not found'
-            ], 404);
-        }
-    }
-
-    // Convert YAML to JSON (simple conversion)
-    $content = file_get_contents($yamlPath);
-    return response($content, 200, [
-        'Content-Type' => 'application/json',
-        'Access-Control-Allow-Origin' => '*'
-    ]);
-});
 
 // ═══════════════════════════════════════════════════════════
 // Apply security middleware to all API routes
@@ -68,9 +27,9 @@ Route::middleware('api-security')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
 
     // ═══════════════════════════════════════════════════════════
-    // Protected routes — require valid Sanctum token
+    // Protected routes — require valid authentication token
     // ═══════════════════════════════════════════════════════════
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware('api.auth:sanctum')->group(function () {
 
         // ── Auth ────────────────────────────────────────────────
         Route::get('/me', [AuthController::class, 'me']);
@@ -106,6 +65,10 @@ Route::middleware('api-security')->group(function () {
             Route::get('/plans', [SubscriptionController::class, 'plans']);
             Route::get('/usage', [SubscriptionController::class, 'usage']);
             Route::post('/upgrade', [SubscriptionController::class, 'upgrade']);
+            // Simulation route (public)
+            Route::get('/simulate-success', [SubscriptionController::class, 'simulateSuccess'])
+                ->withoutMiddleware('api.auth')
+                ->name('subscription.simulate.success');
         });
 
         // ── Advanced RBAC Routes ────────────────────────────────────
@@ -177,15 +140,15 @@ Route::middleware('api-security')->group(function () {
         Route::prefix('users/{user}/permissions')->group(function () {
             // Grant direct permission to user
             Route::post('/', [AdminController::class, 'grantDirectPermission'])
-                ->middleware('check.permission:user.grant.permissions');
+                ->middleware('check.permission:permission.assign');
 
             // Revoke direct permission from user
             Route::delete('/{permission}', [AdminController::class, 'revokeDirectPermission'])
-                ->middleware('check.permission:user.grant.permissions');
+                ->middleware('check.permission:permission.assign');
 
             // Get user's effective permissions
             Route::get('/', [AdminController::class, 'getUserPermissions'])
-                ->middleware('check.permission:user.view.any');
+                ->middleware('check.permission:user.manage');
         });
 
         // ── Admin Routes ────────────────────────────────────────
@@ -196,15 +159,39 @@ Route::middleware('api-security')->group(function () {
             // User management
             Route::get('/users', [AdminController::class, 'users']);
             Route::get('/users/{user}', [AdminController::class, 'showUser']);
+            Route::put('/users/{user}', [AdminController::class, 'updateUser']);
+            Route::delete('/users/{user}', [AdminController::class, 'deleteUser']);
             Route::patch('/users/{user}/plan', [AdminController::class, 'updatePlan']);
 
             // Dynamic permission assignment
             Route::post('/users/{user}/permissions', [AdminController::class, 'syncPermissions']);
             Route::delete('/users/{user}/permissions', [AdminController::class, 'revokeAllPermissions']);
 
+            // Subscription approvals
+            Route::get('/subscriptions/pending', [AdminController::class, 'pendingSubscriptions']);
+            Route::post('/subscriptions/{subscription}/accept', [AdminController::class, 'acceptSubscription']);
+
+            // Plans management
+            Route::get('/plans', [AdminController::class, 'plans']);
+            Route::post('/plans', [AdminController::class, 'createPlan']);
+            Route::patch('/plans/{plan}', [AdminController::class, 'updatePlanDetails']);
+            Route::delete('/plans/{plan}', [AdminController::class, 'deletePlan']);
+
             // Available permissions list (for frontend dropdown)
             Route::get('/permissions', [AdminController::class, 'permissions']);
             Route::get('/stats', [AdminController::class, 'stats']);
+        });
+
+        // ── Provider Routes ────────────────────────────────────────
+        // Provider routes require provider role (provider_admin or provider_employee)
+        Route::prefix('provider')->middleware('role:provider_admin,provider_employee')->group(function () {
+            // Subscription management
+            Route::get('/subscriptions', [ProviderController::class, 'index']);
+            Route::get('/stats', [ProviderController::class, 'stats']);
+            Route::post('/subscriptions', [ProviderController::class, 'store']);
+            Route::put('/subscriptions/{subscription}', [ProviderController::class, 'update']);
+            Route::patch('/subscriptions/{subscription}', [ProviderController::class, 'update']);
+            Route::delete('/subscriptions/{subscription}', [ProviderController::class, 'destroy']);
         });
     });
 
