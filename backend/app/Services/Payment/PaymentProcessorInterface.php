@@ -10,6 +10,11 @@ interface PaymentProcessorInterface
     public function process(array $data): bool;
 
     /**
+     * Create a checkout session (redirect URL).
+     */
+    public function createCheckoutSession(array $data): array;
+
+    /**
      * Refund a payment transaction.
      */
     public function refund(string $transactionId, ?string $reason = null): bool;

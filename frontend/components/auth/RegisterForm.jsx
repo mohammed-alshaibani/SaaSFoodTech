@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/context/AuthContext';
 import { useI18n } from '@/context/I18nContext';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
@@ -13,11 +12,11 @@ export default function RegisterForm() {
     name: '',
     email: '',
     role: '', // Mandatory role selection
+    company_name: '',
     password: '',
     password_confirmation: '',
   });
   const [errors, setErrors] = useState({});
-  const { login } = useAuth();
   const { t, isRTL } = useI18n();
 
   const handleChange = (e) => {
@@ -39,7 +38,19 @@ export default function RegisterForm() {
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.name.trim()) {
+    // Debug logging in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[RegisterForm] Validating form data:', {
+        name: formData.name,
+        email: formData.email,
+        role: formData.role,
+        hasPassword: !!formData.password,
+        hasConfirmPassword: !!formData.password_confirmation,
+        passwordsMatch: formData.password === formData.password_confirmation,
+      });
+    }
+
+    if (!formData.name?.trim()) {
       newErrors.name = t('auth.nameRequired');
     }
 
@@ -47,7 +58,7 @@ export default function RegisterForm() {
       newErrors.role = t('auth.roleRequired');
     }
 
-    if (!formData.email.trim()) {
+    if (!formData.email?.trim()) {
       newErrors.email = t('auth.emailRequired');
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = t('auth.emailInvalid');
@@ -57,8 +68,8 @@ export default function RegisterForm() {
       newErrors.company_name = t('auth.companyName') + ' ' + t('auth.roleRequired');
     }
 
-    // Password Policy Regex: 1 Uppercase, 1 Lowercase, 1 Number, 1 Special Char
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/;
+    // Password Policy Regex: 1 Uppercase, 1 Lowercase, 1 Number, 1 Special Char, 8+ chars
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
 
     if (!formData.password) {
       newErrors.password = t('auth.passwordRequired');
@@ -68,10 +79,14 @@ export default function RegisterForm() {
       newErrors.password = t('auth.passwordCriteria');
     }
 
-    if (!formData.password_confirmation) {
-      newErrors.password_confirmation = t('auth.confirmPassword') + ' ' + t('auth.passwordRequired');
+    if (!formData.password_confirmation?.trim()) {
+      newErrors.password_confirmation = t('auth.confirmPasswordRequired') || 'تأكيد كلمة المرور مطلوب';
     } else if (formData.password !== formData.password_confirmation) {
       newErrors.password_confirmation = t('auth.passwordMismatch');
+    }
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[RegisterForm] Validation errors:', newErrors);
     }
 
     setErrors(newErrors);
@@ -98,29 +113,62 @@ export default function RegisterForm() {
       if (!response.ok) {
         // Handle Laravel validation errors (often nested in 'errors' object)
         if (data.errors) {
-          const firstError = Object.values(data.errors)[0][0];
-          throw new Error(firstError);
+          // Map backend errors to form fields
+          const backendErrors = {};
+          Object.entries(data.errors).forEach(([field, messages]) => {
+            backendErrors[field] = messages[0]; // Take first error for each field
+          });
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log('[RegisterForm] Backend validation errors:', backendErrors);
+          }
+          
+          setErrors(prev => ({ ...prev, ...backendErrors }));
+          
+          // If no field-specific errors, show general error
+          if (Object.keys(backendErrors).length === 0) {
+            const firstError = Object.values(data.errors)[0]?.[0];
+            if (firstError) {
+              setErrors(prev => ({ ...prev, general: firstError }));
+            }
+          }
+          return; // Stop here, don't throw
         }
         throw new Error(data.message || t('auth.registerError'));
       }
 
       // Backend returns access_token
       const { access_token, user } = data;
-      const result = await login({ email: user.email, password: null, access_token });
+      const primaryRole = user.roles?.[0] ?? 'customer';
 
-      if (result.success) {
-        // Redirect based on user role
-        const role = user.roles?.[0] || 'customer';
-        const dashboardPaths = {
-          admin: '/dashboard/admin',
-          customer: '/dashboard/customer',
-          provider_admin: '/dashboard/provider',
-          provider_employee: '/dashboard/provider'
-        };
-        router.push(dashboardPaths[role] || '/dashboard/customer');
-      } else {
-        throw new Error(result.error || 'Login failed after registration');
+      // Persist token + primary role in httpOnly cookie (same as login flow)
+      const sessionRes = await fetch('/api/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: access_token, role: primaryRole }),
+      });
+
+      if (!sessionRes.ok) {
+        throw new Error('Failed to establish session after registration');
       }
+
+      // Check for redirect parameter
+      const urlParams = new URLSearchParams(window.location.search);
+      const redirectPath = urlParams.get('redirect');
+
+      if (redirectPath) {
+        router.push(redirectPath);
+        return;
+      }
+
+      // Redirect based on user role
+      const dashboardPaths = {
+        admin: '/dashboard/admin',
+        customer: '/dashboard/customer',
+        provider_admin: '/dashboard/provider',
+        provider_employee: '/dashboard/provider'
+      };
+      router.push(dashboardPaths[primaryRole] || '/dashboard/customer');
     } catch (error) {
       setErrors({ general: error.message });
     }
@@ -128,7 +176,7 @@ export default function RegisterForm() {
 
   return (
     <div className={`w-full max-w-md mx-auto ${isRTL ? 'text-right' : 'text-left'}`}>
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
 
         {/* Role Selection */}
         <div className="mb-6">

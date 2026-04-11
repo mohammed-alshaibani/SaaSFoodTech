@@ -37,7 +37,9 @@ export default function Sidebar() {
         if (role === 'admin') {
             return [
                 { href: '/dashboard/admin', icon: LayoutDashboard, label: t('sidebar.dashboard') || 'لوحة التحكم', exact: true },
-                { href: '/dashboard/admin/permissions', icon: Users, label: t('sidebar.users') || 'المستخدمين', exact: false },
+                { href: '/dashboard/admin/users', icon: Users, label: t('sidebar.users') || 'المستخدمين', exact: false },
+                { href: '/dashboard/admin/roles', icon: Crown, label: t('sidebar.roles') || 'الأدوار', exact: true },
+                { href: '/dashboard/admin/permissions', icon: ClipboardList, label: t('sidebar.permissions') || 'الصلاحيات', exact: true },
                 { href: '/dashboard/admin/plans', icon: CreditCard, label: t('sidebar.plans') || 'خطط الاشتراك', exact: true },
                 { href: '/dashboard/admin/requests', icon: FileText, label: t('sidebar.requests') || 'طلبات الخدمة', exact: true },
             ];

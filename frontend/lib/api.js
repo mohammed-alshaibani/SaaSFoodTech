@@ -1,12 +1,19 @@
 import axios from 'axios';
 
+// Debug: Log API URL configuration (only in development)
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+if (process.env.NODE_ENV === 'development') {
+    console.log('[API] Base URL:', API_BASE_URL);
+}
+
 const api = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api',
+    baseURL: API_BASE_URL,
     withCredentials: true,
     headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
     },
+    timeout: 30000, // 30 second timeout
 });
 
 // ─── Token cache ─────────────────────────────────────────────────────────────
@@ -53,10 +60,21 @@ api.interceptors.request.use(async (config) => {
     return config;
 });
 
-// ─── Response interceptor: handle 401 globally ────────────────────────────────
+// ─── Response interceptor: handle errors globally ───────────────────────────
 api.interceptors.response.use(
     (response) => response,
     async (error) => {
+        // Log error details in development
+        if (process.env.NODE_ENV === 'development') {
+            console.error('[API Error]', {
+                url: error.config?.url,
+                method: error.config?.method,
+                status: error.response?.status,
+                data: error.response?.data,
+                message: error.message,
+            });
+        }
+
         if (error.response?.status === 401) {
             // Token expired or revoked — clear cache, clear server cookie, go to login
             cachedToken = null;
@@ -66,6 +84,26 @@ api.interceptors.response.use(
                 window.location.href = '/login';
             }
         }
+
+        if (error.response?.status === 403) {
+            // Permission changed or revoked — trigger user data refresh
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('permission-changed'));
+            }
+        }
+
+        if (error.response?.status === 404) {
+            console.error(`[API] Endpoint not found: ${error.config?.url}`);
+        }
+
+        if (error.code === 'ECONNABORTED') {
+            console.error('[API] Request timeout');
+        }
+
+        if (!error.response && error.request) {
+            console.error('[API] Network error - check if backend is running at', API_BASE_URL);
+        }
+
         return Promise.reject(error);
     }
 );

@@ -1,0 +1,742 @@
+{
+    "info": {
+        "_postman_id": "5cf7d525-ea94-45dd-afb4-ba3fdeb0079d",
+        "name": "SaaS Marketplace Platform",
+        "description": "Full collection for the Service Marketplace Platform API including Auth, RBAC, Service Requests, Geolocation, AI, and Subscriptions.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "Authentication",
+            "item": [
+                {
+                    "name": "Register",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"John Doe\",\n    \"email\": \"john@example.com\",\n    \"password\": \"password\",\n    \"password_confirmation\": \"password\",\n    \"role\": \"customer\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/register",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "register"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Login",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "var jsonData = pm.response.json();",
+                                    "if (jsonData.token) {",
+                                    "    pm.collectionVariables.set(\"auth_token\", jsonData.token);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"john@example.com\",\n    \"password\": \"password\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/login",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "login"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Logout",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/logout",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "logout"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Get Profile (Me)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/me",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "me"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Service Requests",
+            "item": [
+                {
+                    "name": "List Requests",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/requests?status=pending",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "requests"
+                            ],
+                            "query": [
+                                {
+                                    "key": "status",
+                                    "value": "pending"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Get Nearby Requests",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/requests/nearby?latitude=40.7128&longitude=-74.0060&radius=10",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "requests",
+                                "nearby"
+                            ],
+                            "query": [
+                                {
+                                    "key": "latitude",
+                                    "value": "40.7128"
+                                },
+                                {
+                                    "key": "longitude",
+                                    "value": "-74.0060"
+                                },
+                                {
+                                    "key": "radius",
+                                    "value": "10"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Create Request",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"title\": \"Fix Leaking Pipe\",\n    \"description\": \"Kitchen sink is leaking. Need immediate repair.\",\n    \"latitude\": 40.7128,\n    \"longitude\": -74.0060,\n    \"category\": \"plumbing\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/requests",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "requests"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Accept Request",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/requests/1/accept",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "requests",
+                                "1",
+                                "accept"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Complete Request",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/requests/1/complete",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "requests",
+                                "1",
+                                "complete"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "AI Features",
+            "item": [
+                {
+                    "name": "AI Enhance Description",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"description\": \"i have a leak in my sink and it is making a mess\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/ai/enhance",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "ai",
+                                "enhance"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "AI Categorize",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"title\": \"Electric wires sparkling\",\n    \"description\": \"I can see sparks coming from my wall outlet.\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/ai/categorize",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "ai",
+                                "categorize"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Subscription Plan",
+            "item": [
+                {
+                    "name": "List Plans",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/subscription/plans",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "subscription",
+                                "plans"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Get Usage Stats",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/subscription/usage",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "subscription",
+                                "usage"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Upgrade Plan",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"plan_id\": \"premium\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/subscription/upgrade",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "subscription",
+                                "upgrade"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "RBAC Management",
+            "item": [
+                {
+                    "name": "Permissions",
+                    "item": [
+                        {
+                            "name": "List Permissions",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    { "key": "Accept", "value": "application/json" },
+                                    { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/permissions",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "permissions"]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Create Permission",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    { "key": "Accept", "value": "application/json" },
+                                    { "key": "Content-Type", "value": "application/json" },
+                                    { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"name\": \"blog.create\",\n    \"display_name\": \"Create Blog Posts\",\n    \"description\": \"Allows users to create new blog articles\",\n    \"category_id\": 1\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/permissions",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "permissions"]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Update Permission",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    { "key": "Accept", "value": "application/json" },
+                                    { "key": "Content-Type", "value": "application/json" },
+                                    { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"name\": \"blog.write\",\n    \"display_name\": \"Write Articles\"\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/permissions/1",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "permissions", "1"]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Delete Permission",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [
+                                    { "key": "Accept", "value": "application/json" },
+                                    { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/permissions/1",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "permissions", "1"]
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Roles",
+                    "item": [
+                        {
+                            "name": "List Roles",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    { "key": "Accept", "value": "application/json" },
+                                    { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/roles",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "roles"]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Get Role Hierarchy",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    { "key": "Accept", "value": "application/json" },
+                                    { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/roles/hierarchy",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "roles", "hierarchy"]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Create Role",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    { "key": "Accept", "value": "application/json" },
+                                    { "key": "Content-Type", "value": "application/json" },
+                                    { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"name\": \"editor\",\n    \"display_name\": \"Content Editor\",\n    \"description\": \"Has full control over content\",\n    \"permissions\": [1, 2],\n    \"parent_roles\": [2]\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/roles",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "roles"]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Grant Permission to Role",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    { "key": "Accept", "value": "application/json" },
+                                    { "key": "Content-Type", "value": "application/json" },
+                                    { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"permission_id\": 5\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/roles/1/permissions/grant",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "roles", "1", "permissions", "grant"]
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "User Permission Assignment",
+                    "item": [
+                        {
+                            "name": "Get Effective User Permissions",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    { "key": "Accept", "value": "application/json" },
+                                    { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/users/1/permissions",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "users", "1", "permissions"]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Grant Direct Permission to User",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    { "key": "Accept", "value": "application/json" },
+                                    { "key": "Content-Type", "value": "application/json" },
+                                    { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"permission_id\": 10\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/users/1/permissions",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "users", "1", "permissions"]
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "Admin Panel",
+            "item": [
+                {
+                    "name": "List Users",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/admin/users",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "admin",
+                                "users"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Get System Stats",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/admin/stats",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "admin",
+                                "stats"
+                            ]
+                        }
+                    }
+                }
+            ]
+        }
+    ],
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "http://localhost:8000"
+        },
+        {
+            "key": "auth_token",
+            "value": ""
+        }
+    ]
+}

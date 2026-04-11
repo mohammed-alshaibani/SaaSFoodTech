@@ -19,6 +19,11 @@ class MainService
     {
         Log::info("Processing new service request creation for user: {$userId}");
 
+        $user = \App\Models\User::find($userId);
+        if ($user->hasExceededRequestLimit()) {
+            abort(403, 'Subscription limit reached. Please upgrade to Pro.');
+        }
+
         // Direct Eloquent usage natively. No over-engineered Repositories needed here.
         $serviceRequest = ServiceRequest::create([
             'customer_id' => $userId,

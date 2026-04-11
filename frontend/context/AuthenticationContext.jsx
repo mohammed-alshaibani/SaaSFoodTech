@@ -1,104 +1,21 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import api from '@/lib/api';
-
-// Types
-/**
- * @typedef {Object} AuthUser
- * @property {number} id
- * @property {string} name
- * @property {string} email
- * @property {string} plan
- * @property {number} request_count
- * @property {boolean} limit_reached
- * @property {number} free_limit
- */
+import api, { clearTokenCache } from '@/lib/api';
 
 const AuthenticationContext = createContext(undefined);
 
-// Authentication Service Class
-class AuthenticationService {
-    constructor() {
-        this.baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-    }
-
-    async login(credentials) {
-        const response = await fetch(`${this.baseUrl}/login`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-            },
-            body: JSON.stringify(credentials),
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.message || 'Login failed');
-        }
-
-        return data;
-    }
-
-    async logout() {
-        try {
-            await api.post('/logout');
-        } catch (error) {
-            console.error('Logout error:', error);
-        }
-    }
-
-    async getCurrentUser() {
-        try {
-            const response = await api.get('/me');
-            return response.data;
-        } catch (error) {
-            return null;
-        }
-    }
-}
-
-// Session Manager Class
-class SessionManager {
-    async saveSession(token, userData) {
-        await fetch('/api/session', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token, user: userData }),
-        });
-    }
-
-    async clearSession() {
-        await fetch('/api/session', { method: 'DELETE' });
-    }
-
-    async hasValidSession() {
-        try {
-            const response = await fetch('/api/session');
-            return response.ok;
-        } catch {
-            return false;
-        }
-    }
-}
-
-// Provider Component
 export function AuthenticationProvider({ children }) {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    const authService = new AuthenticationService();
-    const sessionManager = new SessionManager();
-
     const hydrateUser = useCallback(async () => {
         try {
-            const userData = await authService.getCurrentUser();
-            setUser(userData);
+            const response = await api.get('/me');
+            setUser(response.data);
             setError(null);
-            return userData;
+            return response.data;
         } catch (error) {
             setUser(null);
             setError(error.message);
@@ -109,8 +26,8 @@ export function AuthenticationProvider({ children }) {
     useEffect(() => {
         const restore = async () => {
             try {
-                const hasSession = await sessionManager.hasValidSession();
-                if (hasSession) {
+                const response = await fetch('/api/session');
+                if (response.ok) {
                     await hydrateUser();
                 }
             } catch (error) {
@@ -121,6 +38,21 @@ export function AuthenticationProvider({ children }) {
         };
 
         restore();
+
+        // Listen for permission changes (403 responses)
+        const handlePermissionChange = async () => {
+            await hydrateUser();
+        };
+
+        if (typeof window !== 'undefined') {
+            window.addEventListener('permission-changed', handlePermissionChange);
+        }
+
+        return () => {
+            if (typeof window !== 'undefined') {
+                window.removeEventListener('permission-changed', handlePermissionChange);
+            }
+        };
     }, [hydrateUser]);
 
     const login = useCallback(async (credentials) => {
@@ -128,12 +60,32 @@ export function AuthenticationProvider({ children }) {
         setError(null);
 
         try {
-            const data = await authService.login(credentials);
+            const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+            const response = await fetch(`${baseUrl}/login`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify(credentials),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Login failed');
+            }
+
             const { access_token, user: userData } = data;
+            const role = userData.roles && userData.roles.length > 0 ? userData.roles[0] : 'customer';
 
-            await sessionManager.saveSession(access_token, userData);
+            await fetch('/api/session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: access_token, role }),
+            });
+
             setUser(userData);
-
             return { success: true, user: userData };
         } catch (error) {
             setError(error.message);
@@ -147,14 +99,20 @@ export function AuthenticationProvider({ children }) {
         setLoading(true);
 
         try {
-            await authService.logout();
+            await api.post('/logout');
         } catch (error) {
             console.error('Logout error:', error);
         } finally {
-            await sessionManager.clearSession();
+            await fetch('/api/session', { method: 'DELETE' });
+            clearTokenCache();
             setUser(null);
             setError(null);
             setLoading(false);
+            
+            // Force redirect to login and clear any client-side state
+            if (typeof window !== 'undefined') {
+                window.location.href = '/login';
+            }
         }
     }, []);
 
@@ -167,19 +125,14 @@ export function AuthenticationProvider({ children }) {
     }, []);
 
     const value = {
-        // State
         user,
         loading,
         error,
         isAuthenticated: !!user,
-
-        // Actions
         login,
         logout,
         refreshUser,
         clearError,
-
-        // Utilities
         hydrateUser,
     };
 
@@ -190,7 +143,6 @@ export function AuthenticationProvider({ children }) {
     );
 }
 
-// Hook
 export function useAuth() {
     const context = useContext(AuthenticationContext);
     if (context === undefined) {
@@ -199,5 +151,3 @@ export function useAuth() {
     return context;
 }
 
-// Export classes for testing
-export { AuthenticationService, SessionManager };

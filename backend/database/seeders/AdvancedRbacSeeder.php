@@ -144,7 +144,7 @@ class AdvancedRbacSeeder extends Seeder
                 'group' => $permission['group'],
                 'category_id' => $permission['category_id'],
                 'is_system' => $permission['is_system'],
-                'guard_name' => 'api',
+                'guard_name' => 'sanctum',
             ]);
 
             // Add scoped permissions for location-based access
@@ -174,7 +174,7 @@ class AdvancedRbacSeeder extends Seeder
         foreach ($roles as $role) {
             Role::create([
                 'name' => $role['name'],
-                'guard_name' => 'api',
+                'guard_name' => 'sanctum',
             ]);
         }
     }

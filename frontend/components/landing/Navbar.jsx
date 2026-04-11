@@ -13,6 +13,20 @@ export default function Navbar() {
     const { user } = useAuth();
     const { t, isRTL } = useI18n();
 
+    // Determine dashboard path based on user role
+    const getDashboardPath = () => {
+        if (!user || !user.roles || user.roles.length === 0) return '/dashboard';
+        const role = user.roles[0];
+        if (typeof role === 'string') {
+            if (role === 'admin') return '/dashboard/admin';
+            if (role === 'provider_admin' || role === 'provider_employee') return '/dashboard/provider';
+            return '/dashboard/customer';
+        }
+        if (role.name === 'admin') return '/dashboard/admin';
+        if (role.name === 'provider_admin' || role.name === 'provider_employee') return '/dashboard/provider';
+        return '/dashboard/customer';
+    };
+
     useEffect(() => {
         const handleScroll = () => setScrolled(window.scrollY > 20);
         window.addEventListener('scroll', handleScroll);
@@ -59,13 +73,7 @@ export default function Navbar() {
                     {user ? (
                         <>
                             <Link
-                                href="/subscription"
-                                className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors"
-                            >
-                                {t('common.subscription') || 'Subscription'}
-                            </Link>
-                            <Link
-                                href="/admin" // or use dashboard path helper
+                                href={getDashboardPath()}
                                 className="px-5 py-2.5 rounded-full bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-all active:scale-[0.98] shadow-md shadow-blue-600/10"
                             >
                                 {t('common.dashboard') || 'Dashboard'}

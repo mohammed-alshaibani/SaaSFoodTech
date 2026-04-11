@@ -23,10 +23,10 @@ const AuthContext = createContext(undefined);
 
 // Role -> dashboard path map
 function getDashboardPath(role) {
-  if (role === 'admin') return '/admin';
-  if (role === 'customer') return '/customer';
-  if (role?.startsWith('provider')) return '/provider';
-  return '/';
+  if (role === 'admin') return '/dashboard/admin';
+  if (role === 'customer') return '/dashboard/customer';
+  if (role?.startsWith('provider')) return '/dashboard/provider';
+  return '/dashboard/customer';
 }
 
 // Provider

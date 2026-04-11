@@ -23,7 +23,7 @@ class SubscriptionController extends Controller
 
     /**
      * POST /api/subscription/upgrade
-     * Upgrade user's subscription plan.
+     * Create a pending subscription and notify admins for approval.
      */
     public function upgrade(UpgradePlanRequest $request): JsonResponse
     {
@@ -36,89 +36,44 @@ class SubscriptionController extends Controller
             return response()->json([
                 'success' => false,
                 'error' => 'Requested plan not found.',
-                'request_id' => $request->header('X-Request-ID'),
-                'timestamp' => now()->toISOString(),
             ], 404);
         }
 
-        // Get current plan
-        $currentSubscription = $user->activeSubscription();
-        $currentPlan = $currentSubscription?->subscriptionPlan;
-        $currentPlanName = $currentPlan?->name ?? $user->plan ?? 'free';
+        // Get current plan info
+        $currentPlanName = $user->getCurrentPlan();
 
-        // Validate current plan (prevent downgrades and same plan)
-        if ($currentPlanName === $newPlan->name) {
-            return response()->json([
-                'success' => false,
-                'error' => 'You are already on this plan.',
-                'request_id' => $request->header('X-Request-ID'),
-                'timestamp' => now()->toISOString(),
-            ], 400);
-        }
-
-        // Plan hierarchy validation
-        $planHierarchy = [
-            'free' => 0,
-            'basic' => 1,
-            'premium' => 2,
-            'enterprise' => 3,
-        ];
-
+        // Validate plan hierarchy (prevent same plan or downgrade)
+        $planHierarchy = ['free' => 0, 'basic' => 1, 'premium' => 2, 'enterprise' => 3];
         $currentLevel = $planHierarchy[$currentPlanName] ?? 0;
         $newLevel = $planHierarchy[$newPlan->name] ?? 0;
 
         if ($newLevel <= $currentLevel) {
             return response()->json([
                 'success' => false,
-                'error' => 'Cannot downgrade to a lower or equal plan.',
-                'request_id' => $request->header('X-Request-ID'),
-                'timestamp' => now()->toISOString(),
+                'error' => 'You are already on this plan or cannot downgrade through this portal.',
             ], 400);
         }
 
-        // Process payment
-        $paymentProcessed = $this->paymentService->processPayment($request);
-
-        if (!$paymentProcessed) {
-            return response()->json([
-                'success' => false,
-                'error' => 'Payment processing failed. Please try again.',
-                'request_id' => $request->header('X-Request-ID'),
-                'timestamp' => now()->toISOString(),
-            ], 402);
-        }
-
-        // Create new subscription
-        $subscription = $user->subscribeTo($newPlan, [
+        // 1. Create a PENDING subscription record
+        $subscription = $user->subscriptions()->create([
+            'subscription_plan_id' => $newPlan->id,
+            'status' => 'pending',
+            'starts_at' => now(),
             'metadata' => [
-                'payment_method' => $request->payment_method,
                 'upgraded_from' => $currentPlanName,
             ],
         ]);
 
-        // Update legacy plan field for backward compatibility
-        $user->update(['plan' => $newPlan->name]);
-
-        // Log the upgrade
-        Log::info('User upgraded plan', [
-            'user_id' => $user->id,
-            'from_plan' => $currentPlanName,
-            'to_plan' => $newPlan->name,
-            'subscription_id' => $subscription->id,
-            'payment_method' => $request->payment_method,
-        ]);
+        // 2. Dispatch the event for Admin notification
+        event(new \App\Events\PlanUpgradeRequested($user, $newPlan, $subscription));
 
         return response()->json([
             'success' => true,
-            'message' => 'Plan upgraded successfully.',
+            'message' => 'Upgrade request submitted successfully. Waiting for admin approval.',
             'data' => [
-                'user' => new UserResource($user),
-                'subscription' => $subscription->load('subscriptionPlan'),
-                'new_plan' => $newPlan->name,
-                'previous_plan' => $currentPlanName,
+                'subscription_id' => $subscription->id,
+                'status' => 'pending'
             ],
-            'request_id' => $request->header('X-Request-ID'),
-            'timestamp' => now()->toISOString(),
         ]);
     }
 
@@ -161,12 +116,17 @@ class SubscriptionController extends Controller
     public function usage(Request $request): JsonResponse
     {
         $user = $request->user();
-        $user->load(['roles', 'permissions', 'activeSubscription.subscriptionPlan']);
+        $user->load(['roles', 'permissions']);
 
         // Get usage data from user model
         $usage = $user->getCurrentMonthUsage();
         $currentPlan = $user->getCurrentPlan();
         $activeSubscription = $user->activeSubscription();
+
+        // Load subscription plan if subscription exists
+        if ($activeSubscription) {
+            $activeSubscription->load('subscriptionPlan');
+        }
 
         return response()->json([
             'success' => true,
@@ -191,6 +151,51 @@ class SubscriptionController extends Controller
             ],
             'request_id' => $request->header('X-Request-ID'),
             'timestamp' => now()->toISOString(),
+        ]);
+    }
+
+    /**
+     * GET /api/subscription/simulate-success
+     * Simulate a successful payment callback (Mock only).
+     */
+    public function simulateSuccess(Request $request): JsonResponse
+    {
+        $id = $request->query('subscription_id');
+        $token = $request->query('auth_token');
+
+        // Verify token (Mock security)
+        $expectedToken = md5($id . config('app.key'));
+        if ($token !== $expectedToken) {
+            return response()->json(['success' => false, 'error' => 'Invalid simulation token.'], 403);
+        }
+
+        $subscription = UserSubscription::findOrFail($id);
+        
+        if ($subscription->status !== 'pending') {
+            return response()->json(['success' => false, 'error' => 'Subscription is not in pending state.'], 400);
+        }
+
+        // Activate subscription
+        $subscription->update([
+            'status' => 'active',
+            'starts_at' => now(),
+        ]);
+
+        // Sync legacy plan field
+        $subscription->user->update(['plan' => $subscription->subscriptionPlan->name]);
+
+        Log::info('Subscription activated via simulation', [
+            'subscription_id' => $id,
+            'user_id' => $subscription->user_id,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Payment simulated successfully. Plan upgraded.',
+            'data' => [
+                'plan' => $subscription->subscriptionPlan->name,
+                'status' => 'active'
+            ]
         ]);
     }
 }

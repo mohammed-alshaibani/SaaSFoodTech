@@ -38,9 +38,7 @@ export default function ProviderLayout({ children }) {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between h-16 items-center">
                         <div className="flex items-center gap-3">
-                            <span className="text-xl font-bold text-green-600">ServiceHub</span>
-                            <span className="text-gray-300">|</span>
-                            <span className="text-sm text-gray-500">Provider Portal</span>
+                            <span className="text-xl font-bold text-green-600">Provider Portal</span>
                         </div>
                         <div className="flex items-center gap-3">
                             <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-semibold">

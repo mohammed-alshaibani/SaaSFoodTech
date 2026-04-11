@@ -1,72 +1,87 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import Link from 'next/link';
 import api from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { useEcho } from '@/hooks/useEcho';
-import { Search, Filter, Plus, MapPin, Clock, Star, TrendingUp } from 'lucide-react';
+import { useI18n } from '@/context/I18nContext';
+import DashboardLayout from '@/components/DashboardLayout';
+import { format } from 'date-fns';
+import {
+    Search,
+    Filter,
+    Plus,
+    MapPin,
+    Clock,
+    Star,
+    TrendingUp,
+    ArrowUpRight,
+    X,
+    FileText,
+    CheckCircle2,
+    LayoutGrid,
+    AlertCircle,
+    Crown
+} from 'lucide-react';
 
-// ─── Upgrade Banner ─────────────────────────────────────────────────────────
-function UpgradeBanner({ requestCount, freeLimit }) {
+// ─── Stat Card ──────────────────────────────────────────────────────────────
+function StatCard({ title, value, icon: Icon, color, t }) {
+    const colors = {
+        emerald: 'text-emerald-500 bg-emerald-50 border-emerald-200',
+        blue: 'text-blue-500 bg-blue-50 border-blue-200',
+        amber: 'text-amber-500 bg-amber-50 border-amber-200',
+        purple: 'text-[#7C3AED] bg-[#7C3AED]/10 border-[#7C3AED]/20',
+    };
     return (
-        <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between gap-4">
-            <div>
-                <p className="font-semibold text-amber-800">Free Plan Limit Reached</p>
-                <p className="text-sm text-amber-600">
-                    You have used {requestCount}/{freeLimit} requests on the free plan.
-                    Contact an admin to upgrade to Paid.
-                </p>
+        <div className="bg-white border border-gray-100 p-6 rounded-3xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgb(124,58,237,0.08)] transition-all duration-300 group">
+            <div className="flex items-center justify-between mb-4">
+                <div className={`p-3 rounded-2xl border ${colors[color] || colors.purple}`}>
+                    <Icon size={20} />
+                </div>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{title}</p>
             </div>
-            <span className="shrink-0 text-2xl">🔒</span>
+            <p className="text-3xl font-black text-[#1E293B]">{value}</p>
         </div>
     );
 }
 
-// ─── Status Badge ───────────────────────────────────────────────────────────
-function StatusBadge({ status }) {
-    const colors = {
-        pending: 'bg-yellow-100 text-yellow-800',
-        accepted: 'bg-blue-100 text-blue-800',
-        completed: 'bg-green-100 text-green-800',
-    };
+// ─── Empty State ────────────────────────────────────────────────────────────
+function EmptyState({ t }) {
     return (
-        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${colors[status] ?? 'bg-gray-100 text-gray-600'}`}>
-            {status}
-        </span>
+        <div className="flex flex-col items-center justify-center p-20 text-center gap-6 animate-in fade-in zoom-in duration-500">
+            <div className="w-24 h-24 bg-gray-100 rounded-[32px] flex items-center justify-center text-gray-400 border border-gray-200 ring-8 ring-gray-100/50">
+                <FileText size={48} />
+            </div>
+            <div className="max-w-xs space-y-2">
+                <h3 className="text-xl font-black text-[#1E293B]">{t('dashboard.noRequests')}</h3>
+                <p className="text-sm font-medium text-gray-500 leading-relaxed">{t('dashboard.emptyStateDesc') || 'ابدأ بإنشاء طلبك الأول باستخدام زر الطلبية الجديدة'}</p>
+            </div>
+        </div>
     );
 }
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 export default function CustomerDashboard() {
     const { user, refreshUser } = useAuth();
+    const { t, isRTL } = useI18n();
 
     const [requests, setRequests] = useState([]);
-    const [filteredRequests, setFilteredRequests] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
-    const [formData, setFormData] = useState({
-        title: '',
-        description: '',
-        latitude: 24.7136,  // Default to Riyadh
-        longitude: 46.6753,
-    });
-    const [message, setMessage] = useState({ text: '', type: 'info' });
+    const [formData, setFormData] = useState({ title: '', description: '', latitude: 24.7136, longitude: 46.6753 });
+    const [message, setMessage] = useState(null);
     const [enhancing, setEnhancing] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
-    // Enhanced filtering
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [sortBy, setSortBy] = useState('newest');
-    const [showFilters, setShowFilters] = useState(false);
-    const [stats, setStats] = useState({ total: 0, pending: 0, accepted: 0, completed: 0 });
 
-    // subscription gate data comes from /me (via AuthContext user object)
     const limitReached = user?.limit_reached ?? false;
     const requestCount = user?.request_count ?? 0;
     const freeLimit = user?.free_limit ?? 3;
 
-    // ── Fetch requests ────────────────────────────────────────
     const fetchRequests = useCallback(async () => {
         setLoading(true);
         try {
@@ -77,424 +92,240 @@ export default function CustomerDashboard() {
         } finally {
             setLoading(false);
         }
-    }, []); // no dependencies — always fetches all (scoped by backend)
+    }, []);
 
     useEffect(() => {
         fetchRequests();
-    }, [fetchRequests]);
 
-    // Filtering and sorting logic
-    useEffect(() => {
+        // Check for payment success from redirect
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('payment') === 'success') {
+            setMessage({
+                text: isRTL ? 'تم تفعيل الاشتراك بنجاح! استمتع بالمميزات الجديدة.' : 'Subscription Activated! Enjoy your new features.',
+                type: 'success'
+            });
+            refreshUser();
+            // Clear URL params
+            window.history.replaceState({}, document.title, window.location.pathname);
+            setTimeout(() => setMessage(null), 5000);
+        }
+    }, [fetchRequests, refreshUser, isRTL]);
+
+    const filteredRequests = useMemo(() => {
         let filtered = [...requests];
-
-        // Search filter
         if (searchTerm) {
-            filtered = filtered.filter(req => 
+            filtered = filtered.filter(req =>
                 req.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                req.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                req.provider?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+                req.description.toLowerCase().includes(searchTerm.toLowerCase())
             );
         }
-
-        // Status filter
         if (statusFilter !== 'all') {
             filtered = filtered.filter(req => req.status === statusFilter);
         }
-
-        // Sorting
         filtered.sort((a, b) => {
             switch (sortBy) {
-                case 'newest':
-                    return new Date(b.created_at) - new Date(a.created_at);
-                case 'oldest':
-                    return new Date(a.created_at) - new Date(b.created_at);
-                case 'title':
-                    return a.title.localeCompare(b.title);
-                default:
-                    return 0;
+                case 'newest': return new Date(b.created_at) - new Date(a.created_at);
+                case 'oldest': return new Date(a.created_at) - new Date(b.created_at);
+                case 'title': return a.title.localeCompare(b.title);
+                default: return 0;
             }
         });
-
-        setFilteredRequests(filtered);
-
-        // Update stats
-        const newStats = {
-            total: requests.length,
-            pending: requests.filter(r => r.status === 'pending').length,
-            accepted: requests.filter(r => r.status === 'accepted').length,
-            completed: requests.filter(r => r.status === 'completed').length,
-        };
-        setStats(newStats);
+        return filtered;
     }, [requests, searchTerm, statusFilter, sortBy]);
 
-    // Real-time updates via Reverb
+    const stats = useMemo(() => ({
+        total: requests.length,
+        pending: requests.filter(r => r.status === 'pending').length,
+        accepted: requests.filter(r => r.status === 'accepted').length,
+        completed: requests.filter(r => r.status === 'completed').length,
+    }), [requests]);
+
     useEcho(
         user ? `user.${user.id}` : null,
         'ServiceRequestUpdated',
         useCallback((data) => {
             const updated = data.request;
             if (!updated) return;
-
             setRequests(prev => {
                 const idx = prev.findIndex(r => r.id === updated.id);
-                if (idx === -1) {
-                    return [updated, ...prev];
-                }
+                if (idx === -1) return [updated, ...prev];
                 const next = [...prev];
                 next[idx] = { ...next[idx], ...updated };
                 return next;
             });
-
-            const actionLabels = { accepted: 'Accepted', completed: 'Completed', created: 'New request' };
-            setMessage({
-                text: `${actionLabels[data.action] ?? 'Updated'}: "${updated.title}"`,
-                type: data.action === 'completed' ? 'success' : 'info'
-            });
-            setTimeout(() => setMessage({ text: '', type: 'info' }), 3000);
-        }, []),
+            setMessage({ text: `${t(`dashboard.${data.action}`)}: "${updated.title}"`, type: 'success' });
+            setTimeout(() => setMessage(null), 3000);
+        }, [t]),
         [user?.id]
     );
 
-    // ── AI Enhance ────────────────────────────────────────────
-    const handleEnhance = async () => {
-        if (!formData.title || !formData.description) return;
-        setEnhancing(true);
-        setMessage({ text: '✨ Enhancing description...', type: 'info' });
-        try {
-            const res = await api.post('/ai/enhance', {
-                title: formData.title,
-                description: formData.description,
-            });
-            setFormData(prev => ({ ...prev, description: res.data.enhanced_description }));
-            const wasEnhanced = res.data.was_enhanced;
-            setMessage({
-                text: wasEnhanced ? '✅ Description enhanced!' : '⚠️ AI returned the original (check your API key).',
-                type: wasEnhanced ? 'success' : 'warning',
-            });
-        } catch (err) {
-            setMessage({ text: '❌ AI enhancement failed. You can still submit.', type: 'error' });
-        } finally {
-            setEnhancing(false);
-        }
-    };
-
-    // ── Submit new request ────────────────────────────────────
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (limitReached) return; // double-guard — button is also disabled
         setSubmitting(true);
-        setMessage({ text: '', type: 'info' });
         try {
             await api.post('/requests', formData);
             setShowForm(false);
             setFormData({ title: '', description: '', latitude: 24.7136, longitude: 46.6753 });
-            await fetchRequests();
-            await refreshUser(); // re-sync request_count + limit_reached from /api/me
-            setMessage({ text: '✅ Request created successfully!', type: 'success' });
-        } catch (err) {
-            const msg = err.response?.data?.message || 'Failed to create request.';
-            setMessage({ text: msg, type: 'error' });
+            fetchRequests();
+            refreshUser();
+            setMessage({ text: t('dashboard.requestCreated') || 'تم إنشاء الطلب', type: 'success' });
+        } catch {
+            setMessage({ text: t('dashboard.submissionFailed') || 'فشل الإرسال', type: 'error' });
         } finally {
             setSubmitting(false);
         }
     };
 
-    // ── Message styles ────────────────────────────────────────
-    const msgStyles = {
-        info: 'bg-blue-50 text-blue-700 border-blue-200',
-        success: 'bg-green-50 text-green-700 border-green-200',
-        warning: 'bg-amber-50 text-amber-700 border-amber-200',
-        error: 'bg-red-50 text-red-700 border-red-200',
-    };
-
-    // ── Render ────────────────────────────────────────────────
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-6 md:p-10">
-
-            {/* Page header */}
-            <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
-                        Customer Dashboard
-                    </h1>
-                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                        Manage your service requests and track their progress.
-                    </p>
-                </div>
-                <button
-                    onClick={() => setShowForm(v => !v)}
-                    disabled={limitReached}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition
-                        ${limitReached
-                            ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                            : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}
-                >
-                    <Plus className="h-4 w-4" />
-                    {showForm ? 'Cancel' : 'New Request'}
-                </button>
-            </div>
-
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 p-4">
-                    <div className="flex items-center justify-between">
+        <DashboardLayout>
+            <div className="space-y-10">
+                {/* Header Section */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 bg-white/50 pb-6 border-b border-gray-100">
+                    <div className="flex items-center gap-5">
+                        <div className="w-14 h-14 bg-gradient-to-tr from-[#7C3AED] to-purple-400 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-purple-500/20 shrink-0">
+                            <Star size={28} fill="currentColor" />
+                        </div>
                         <div>
-                            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Total Requests</p>
-                            <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{stats.total}</p>
-                        </div>
-                        <TrendingUp className="h-8 w-8 text-indigo-500" />
-                    </div>
-                </div>
-                <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 p-4">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Pending</p>
-                            <p className="text-2xl font-bold text-amber-600">{stats.pending}</p>
-                        </div>
-                        <Clock className="h-8 w-8 text-amber-500" />
-                    </div>
-                </div>
-                <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 p-4">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">In Progress</p>
-                            <p className="text-2xl font-bold text-blue-600">{stats.accepted}</p>
-                        </div>
-                        <Star className="h-8 w-8 text-blue-500" />
-                    </div>
-                </div>
-                <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 p-4">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Completed</p>
-                            <p className="text-2xl font-bold text-emerald-600">{stats.completed}</p>
-                        </div>
-                        <div className="h-8 w-8 bg-emerald-100 rounded-full flex items-center justify-center">
-                            <span className="text-emerald-600 font-bold">C</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Upgrade banner */}
-            {limitReached && (
-                <UpgradeBanner requestCount={requestCount} freeLimit={freeLimit} />
-            )}
-
-            {/* Toast message */}
-            {message.text && (
-                <div className={`fixed top-5 end-5 z-50 px-4 py-3 rounded-xl border shadow-lg text-sm font-medium transition-all ${msgStyles[message.type]}`}>
-                    {message.text}
-                </div>
-            )}
-
-            {/* Enhanced Search and Filters */}
-            <div className="mb-6 flex flex-col lg:flex-row gap-4">
-                {/* Search Bar */}
-                <div className="flex-1 relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <input
-                        type="text"
-                        placeholder="Search your requests..."
-                        value={searchTerm}
-                        onChange={e => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                </div>
-
-                {/* Filter Toggle */}
-                <button
-                    onClick={() => setShowFilters(!showFilters)}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition"
-                >
-                    <Filter className="h-4 w-4" />
-                    Filters
-                    {(statusFilter !== 'all' || sortBy !== 'newest') && (
-                        <span className="w-2 h-2 bg-indigo-600 rounded-full"></span>
-                    )}
-                </button>
-            </div>
-
-            {/* Expanded Filters */}
-            {showFilters && (
-                <div className="mb-6 p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {/* Status Filter */}
-                        <div>
-                            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-2">Status</label>
-                            <select
-                                value={statusFilter}
-                                onChange={e => setStatusFilter(e.target.value)}
-                                className="w-full text-sm border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            >
-                                <option value="all">All Status</option>
-                                <option value="pending">Pending</option>
-                                <option value="accepted">In Progress</option>
-                                <option value="completed">Completed</option>
-                            </select>
-                        </div>
-
-                        {/* Sort By */}
-                        <div>
-                            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-2">Sort By</label>
-                            <select
-                                value={sortBy}
-                                onChange={e => setSortBy(e.target.value)}
-                                className="w-full text-sm border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            >
-                                <option value="newest">Newest First</option>
-                                <option value="oldest">Oldest First</option>
-                                <option value="title">Title A-Z</option>
-                            </select>
-                        </div>
-
-                        {/* Clear Filters */}
-                        <div className="flex items-end">
-                            <button
-                                onClick={() => {
-                                    setSearchTerm('');
-                                    setStatusFilter('all');
-                                    setSortBy('newest');
-                                }}
-                                className="w-full text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 font-medium"
-                            >
-                                Clear Filters
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Create form */}
-            {showForm && !limitReached && (
-                <div className="bg-white p-6 rounded-lg shadow-sm border space-y-4">
-                    <h3 className="text-lg font-medium">Create New Request</h3>
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        {/* Title */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
-                            <input
-                                type="text"
-                                value={formData.title}
-                                onChange={e => setFormData(p => ({ ...p, title: e.target.value }))}
-                                className="w-full rounded-md border-gray-300 border p-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
-                                required
-                            />
-                        </div>
-
-                        {/* Description + AI enhance */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                            <textarea
-                                value={formData.description}
-                                onChange={e => setFormData(p => ({ ...p, description: e.target.value }))}
-                                className="w-full rounded-md border-gray-300 border p-2 h-28 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
-                                required
-                            />
-                            <div className="flex justify-end mt-1">
-                                <button
-                                    type="button"
-                                    onClick={handleEnhance}
-                                    disabled={enhancing || !formData.title || !formData.description}
-                                    className="text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded hover:bg-purple-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {enhancing ? '⏳ Enhancing...' : '✨ Enhance with AI'}
-                                </button>
+                            <div className="flex items-center gap-4">
+                                <h1 className="text-3xl font-black text-[#1E293B] tracking-tight">
+                                    {t('dashboard.customerTitle')}
+                                </h1>
+                                <span className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest ${user?.plan === 'free' ? 'bg-gray-100 text-gray-500 border border-gray-200' : 'bg-[#7C3AED] text-white shadow-md shadow-purple-500/20'}`}>
+                                    {user?.plan === 'free' ? t('dashboard.freePlan') : t('dashboard.proMember')}
+                                </span>
                             </div>
+                            <p className="text-gray-500 font-medium mt-1">
+                                {t('dashboard.manageRequests')}
+                            </p>
                         </div>
+                    </div>
+                    <button
+                        onClick={() => setShowForm(v => !v)}
+                        disabled={limitReached}
+                        className={`flex items-center justify-center gap-2 px-6 py-3 rounded-full text-sm font-bold transition-all shadow-sm
+                            ${limitReached
+                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
+                                : 'bg-[#7C3AED] hover:bg-purple-700 text-white shadow-purple-500/20 active:scale-[0.98]'}`}
+                    >
+                        {showForm ? <X size={18} /> : <Plus size={18} />}
+                        {showForm ? t('dashboard.cancel') : t('dashboard.newRequest')}
+                    </button>
+                </div>
 
-                        {/* Location */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Latitude</label>
-                                <input
-                                    type="number" step="any"
-                                    value={formData.latitude}
-                                    onChange={e => setFormData(p => ({ ...p, latitude: parseFloat(e.target.value) }))}
-                                    className="w-full rounded-md border p-2 text-sm border-gray-300"
-                                    required
-                                />
+                {/* Sub Banner */}
+                {user?.plan === 'free' && (
+                    <div className="bg-gradient-to-r from-amber-500 to-orange-400 group rounded-3xl p-6 flex flex-col md:flex-row items-center justify-between shadow-lg shadow-amber-500/10 border border-amber-200/50">
+                        <div className="flex items-center gap-5">
+                            <div className="w-14 h-14 bg-white/30 backdrop-blur-sm rounded-2xl flex items-center justify-center text-white shadow-inner">
+                                <Crown size={28} fill="currentColor" />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Longitude</label>
-                                <input
-                                    type="number" step="any"
-                                    value={formData.longitude}
-                                    onChange={e => setFormData(p => ({ ...p, longitude: parseFloat(e.target.value) }))}
-                                    className="w-full rounded-md border p-2 text-sm border-gray-300"
-                                    required
-                                />
+                                <h4 className="text-lg font-black text-white uppercase tracking-wider">{t('dashboard.upgradePro')}</h4>
+                                <p className="text-white/90 font-medium text-sm mt-1">{t('dashboard.usage')}: {requestCount}/{freeLimit} {t('dashboard.requestsUsed') || 'طلبات مستخدمة'}</p>
                             </div>
                         </div>
+                        <Link href="/subscription" className="mt-4 md:mt-0 px-6 py-3 bg-white text-amber-600 rounded-xl text-sm font-bold hover:bg-gray-50 transition active:scale-95 shadow-md flex items-center gap-2">
+                            {t('dashboard.upgradePro')} <ArrowUpRight size={18} />
+                        </Link>
+                    </div>
+                )}
 
-                        <button
-                            type="submit"
-                            disabled={submitting}
-                            className="w-full bg-blue-600 text-white rounded-md py-2 hover:bg-blue-700 transition disabled:opacity-60 text-sm font-medium"
+                {/* Stats Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <StatCard title={t('dashboard.totalRequests')} value={stats.total} icon={LayoutGrid} color="purple" t={t} />
+                    <StatCard title={t('dashboard.pending')} value={stats.pending} icon={Clock} color="amber" t={t} />
+                    <StatCard title={t('dashboard.inProgress')} value={stats.accepted} icon={TrendingUp} color="blue" t={t} />
+                    <StatCard title={t('dashboard.complete')} value={stats.completed} icon={CheckCircle2} color="emerald" t={t} />
+                </div>
+
+                {/* Filters Row */}
+                <div className="flex flex-col lg:flex-row gap-4 items-center">
+                    <div className={`flex-1 relative w-full translate-z-0 ${isRTL ? 'rtl' : ''}`}>
+                        <Search className={`absolute top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 ${isRTL ? 'right-4 left-auto' : 'left-4'}`} />
+                        <input
+                            type="text"
+                            placeholder={t('dashboard.searchPlaceholder')}
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
+                            className={`w-full bg-white border border-gray-200 rounded-2xl py-4 text-sm font-bold text-[#1E293B] outline-none hover:border-gray-300 focus:border-[#7C3AED] focus:ring-1 focus:ring-[#7C3AED] transition shadow-sm ${isRTL ? 'pr-12 pl-4' : 'pl-12 pr-4'}`}
+                        />
+                    </div>
+                    <div className="flex gap-3 w-full lg:w-auto">
+                        <select
+                            value={statusFilter}
+                            onChange={e => setStatusFilter(e.target.value)}
+                            className="flex-1 lg:w-48 bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-600 outline-none hover:border-gray-300 focus:border-[#7C3AED] appearance-none shadow-sm"
                         >
-                            {submitting ? 'Submitting...' : 'Submit Request'}
+                            <option value="all">{t('dashboard.allStatuses') || 'جميع الحالات'}</option>
+                            <option value="pending">{t('dashboard.pending')}</option>
+                            <option value="accepted">{t('dashboard.accepted')}</option>
+                            <option value="completed">{t('dashboard.complete')}</option>
+                        </select>
+                        <button className="px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:text-[#7C3AED] hover:border-[#7C3AED]/30 transition shadow-sm flex items-center gap-2">
+                            <Filter size={16} /> {t('dashboard.filters')}
                         </button>
-                    </form>
+                    </div>
                 </div>
-            )}
 
-            {/* Requests List */}
-            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden">
-                {loading ? (
-                    <div className="flex items-center justify-center py-24 text-slate-400">
-                        <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-500 border-t-transparent" />
-                    </div>
-                ) : filteredRequests.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-24 text-slate-400 gap-3">
-                        <span className="text-5xl">Folder</span>
-                        <p className="text-sm">
-                            {searchTerm || statusFilter !== 'all'
-                                ? 'No requests match your filters.'
-                                : 'No requests yet. Create your first one!'}
-                        </p>
-                    </div>
-                ) : (
-                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                        {filteredRequests.map(req => (
-                            <div key={req.id} className="p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
-                                <div className="flex items-start justify-between gap-4">
-                                    <div className="flex-1 min-w-0">
-                                        <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-2">{req.title}</h3>
-                                        <p className="text-sm text-slate-600 dark:text-slate-400 mb-3 line-clamp-2">{req.description}</p>
-                                        <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
-                                            <span className="flex items-center gap-1">
-                                                <Clock className="h-3 w-3" />
-                                                {new Date(req.created_at).toLocaleDateString()}
-                                            </span>
-                                            <span className="flex items-center gap-1">
-                                                <MapPin className="h-3 w-3" />
-                                                {req.latitude?.toFixed(2)}, {req.longitude?.toFixed(2)}
-                                            </span>
+                {/* User Request List */}
+                <div className="bg-white border border-gray-200 rounded-3xl shadow-sm overflow-hidden min-h-[400px]">
+                    {loading ? (
+                        <div className="flex items-center justify-center p-40">
+                            <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#7C3AED] border-t-transparent" />
+                        </div>
+                    ) : filteredRequests.length === 0 ? (
+                        <EmptyState t={t} />
+                    ) : (
+                        <div className="divide-y divide-gray-100">
+                            {filteredRequests.map(req => (
+                                <div key={req.id} className="p-6 hover:bg-gray-50/50 transition-all cursor-pointer group">
+                                    <div className="flex flex-col md:flex-row justify-between gap-6">
+                                        <div className="space-y-3 flex-1">
+                                            <div className="flex items-center gap-3">
+                                                <h3 className="text-lg font-bold text-[#1E293B] group-hover:text-[#7C3AED] transition-colors">{req.title}</h3>
+                                                <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${req.status === 'pending' ? 'bg-amber-100 text-amber-600 border border-amber-200' : req.status === 'completed' ? 'bg-emerald-100 text-emerald-600 border border-emerald-200' : 'bg-[#7C3AED]/10 text-[#7C3AED] border border-[#7C3AED]/20'}`}>
+                                                    {t(`dashboard.${req.status}`)}
+                                                </span>
+                                            </div>
+                                            <p className="text-gray-500 font-medium line-clamp-2 max-w-3xl leading-relaxed text-sm">{req.description}</p>
+                                            <div className="flex flex-wrap gap-3 pt-1">
+                                                <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-lg border border-gray-200">
+                                                    <Clock size={14} className="text-[#7C3AED]" />
+                                                    <span className="text-[11px] font-bold text-gray-500">
+                                                        {req.created_at ? format(new Date(req.created_at), 'yyyy/MM/dd') : 'N/A'}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-lg border border-gray-200">
+                                                    <MapPin size={14} className="text-[#7C3AED]" />
+                                                    <span className="text-[11px] font-bold text-gray-500">{req.latitude?.toFixed(2)}, {req.longitude?.toFixed(2)}</span>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className="flex flex-col items-end gap-2">
-                                        <StatusBadge status={req.status} />
-                                        {req.provider?.name && (
-                                            <div className="text-xs text-slate-500 dark:text-slate-400">
-                                                Provider: {req.provider.name}
+                                        {req.provider && (
+                                            <div className="flex items-center gap-3 bg-[#7C3AED]/5 p-3 rounded-2xl border border-[#7C3AED]/10 h-fit">
+                                                <div className="w-10 h-10 bg-[#7C3AED] rounded-xl flex items-center justify-center text-white font-bold shadow-md shadow-purple-500/20 uppercase">
+                                                    {req.provider.name?.[0]}
+                                                </div>
+                                                <div>
+                                                    <p className="text-[10px] font-bold text-[#7C3AED]/70 uppercase tracking-wider">{t('dashboard.provider') || 'المزود'}</p>
+                                                    <p className="text-sm font-bold text-[#1E293B]">{req.provider.name}</p>
+                                                </div>
                                             </div>
                                         )}
                                     </div>
                                 </div>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Submit Toast */}
+                {message && (
+                    <div className={`fixed bottom-10 ${isRTL ? 'left-10' : 'right-10'} z-[60] px-6 py-4 rounded-2xl text-sm font-bold shadow-xl animate-in slide-in-from-bottom-5 ${message.type === 'error' ? 'bg-red-500 text-white' : 'bg-[#7C3AED] text-white'}`}>
+                        {message.text}
                     </div>
                 )}
             </div>
-
-            {/* Footer */}
-            {!loading && filteredRequests.length > 0 && (
-                <p className="mt-6 text-xs text-slate-400 text-end">
-                    {filteredRequests.length} request{filteredRequests.length !== 1 ? 's' : ''} shown
-                    {searchTerm && ` (filtered by "${searchTerm}")`}
-                    {statusFilter !== 'all' && ` (${statusFilter})`}
-                </p>
-            )}
-        </div>
+        </DashboardLayout>
     );
 }

@@ -28,14 +28,14 @@ class UpgradePlanRequest extends FormRequest
                 'in:free,basic,premium,enterprise',
             ],
             'payment_method' => [
-                'required',
+                'nullable', // Optional - will default to credit_card
                 'string',
-                'in:card,paypal,bank_transfer',
+                'in:credit_card,card,paypal,bank_transfer',
             ],
             'payment_token' => [
-                'required_if:payment_method,card',
+                'nullable', // Optional for simulation
                 'string',
-                'min:10',
+                'min:5',
                 'max:255',
             ],
         ];

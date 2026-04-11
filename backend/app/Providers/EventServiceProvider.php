@@ -6,12 +6,7 @@ use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Event;
-use App\Events\ServiceRequestCreated;
-use App\Events\ServiceRequestAccepted;
-use App\Events\ServiceRequestCompleted;
-use App\Listeners\ServiceRequestCreatedListener;
-use App\Listeners\ServiceRequestAcceptedListener;
-use App\Listeners\ServiceRequestCompletedListener;
+
 
 class EventServiceProvider extends ServiceProvider
 {
@@ -25,17 +20,7 @@ class EventServiceProvider extends ServiceProvider
             SendEmailVerificationNotification::class,
         ],
         
-        ServiceRequestCreated::class => [
-            ServiceRequestCreatedListener::class,
-        ],
-        
-        ServiceRequestAccepted::class => [
-            ServiceRequestAcceptedListener::class,
-        ],
-        
-        ServiceRequestCompleted::class => [
-            ServiceRequestCompletedListener::class,
-        ],
+
     ];
 
     /**

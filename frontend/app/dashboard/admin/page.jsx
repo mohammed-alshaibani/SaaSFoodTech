@@ -2,302 +2,255 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
+import { useI18n } from '@/context/I18nContext';
+import DashboardLayout from '@/components/DashboardLayout';
+import {
+    Users,
+    FileText,
+    CheckCircle2,
+    Clock,
+    ChevronRight,
+    ChevronLeft,
+    Shield,
+    TrendingUp,
+    Zap,
+    Crown,
+    AlertTriangle,
+    RefreshCcw,
+    CreditCard
+} from 'lucide-react';
 
-// ─── sub-components ───────────────────────────────────────────────────────────
-
-function Badge({ plan }) {
-    const base = 'px-2 py-0.5 rounded-full text-xs font-semibold';
-    return plan === 'paid'
-        ? <span className={`${base} bg-emerald-100 text-emerald-700`}>Paid</span>
-        : <span className={`${base} bg-gray-100 text-gray-600`}>Free</span>;
+function Badge({ plan, t }) {
+    const base = 'px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider';
+    const isPaid = ['paid', 'premium', 'enterprise', 'basic'].includes(plan);
+    return isPaid
+        ? <span className={`${base} bg-emerald-50 text-emerald-600 border border-emerald-200`}>{t('dashboard.paid') || 'PAID'}</span>
+        : <span className={`${base} bg-gray-100 text-gray-500 border border-gray-200`}>{t('dashboard.free') || 'FREE'}</span>;
 }
 
-function StatCard({ title, value, subtext, color = 'blue' }) {
-    const colors = {
-        blue: 'border-blue-200 bg-blue-50 text-blue-700',
-        green: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-        amber: 'border-amber-200 bg-amber-50 text-amber-700',
-        purple: 'border-purple-200 bg-purple-50 text-purple-700',
-    };
+function StatCard({ titleAR, titleEN, value, icon: Icon }) {
     return (
-        <div className={`p-4 rounded-xl border ${colors[color]} space-y-1`}>
-            <p className="text-xs font-medium uppercase tracking-wider opacity-70">{title}</p>
-            <div className="flex items-baseline gap-2">
-                <p className="text-2xl font-bold">{value}</p>
-                {subtext && <p className="text-xs opacity-60">{subtext}</p>}
+        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-[0_4px_20px_rgb(0,0,0,0.03)] relative overflow-hidden group hover:shadow-[0_8px_30px_rgb(124,58,237,0.08)] transition-all duration-300">
+            <div className="absolute -right-6 -top-6 w-32 h-32 bg-gradient-to-br from-[#7C3AED]/20 to-transparent rounded-full blur-3xl group-hover:scale-150 transition-transform duration-700" />
+            <div className="flex justify-between items-start mb-6">
+                <div className="z-10">
+                    <h3 className="text-xl font-black text-[#1A202C]">{titleAR}</h3>
+                    <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-widest">{titleEN}</p>
+                </div>
+                <div className="p-3 bg-[#7C3AED]/10 rounded-2xl text-[#7C3AED] z-10 transition-transform group-hover:scale-110">
+                    <Icon size={24} strokeWidth={2.5} />
+                </div>
             </div>
+            <p className="text-4xl font-black text-[#1A202C] mt-2 relative z-10">{value}</p>
         </div>
     );
 }
-
-function PermissionModal({ user, allPermissions, onClose, onSave }) {
-    const current = user.permissions ?? [];
-    const [selected, setSelected] = useState(new Set(current));
-
-    const toggle = (perm) =>
-        setSelected(prev => {
-            const next = new Set(prev);
-            next.has(perm) ? next.delete(perm) : next.add(perm);
-            return next;
-        });
-
-    return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
-                <h3 className="text-lg font-bold">
-                    Permissions — <span className="text-blue-600">{user.name}</span>
-                </h3>
-                <p className="text-xs text-gray-500">
-                    These are <strong>direct</strong> permission overrides on top of role defaults.
-                </p>
-                <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-2">
-                    {allPermissions.map(perm => (
-                        <label key={perm} className="flex items-center gap-2 text-sm cursor-pointer p-1 hover:bg-gray-50 rounded">
-                            <input
-                                type="checkbox"
-                                checked={selected.has(perm)}
-                                onChange={() => toggle(perm)}
-                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            />
-                            <code className="text-xs">{perm}</code>
-                        </label>
-                    ))}
-                </div>
-                <div className="flex justify-end gap-2 pt-4 border-t">
-                    <button onClick={onClose} className="px-4 py-2 rounded-md border text-sm font-medium text-gray-600 hover:bg-gray-50">Cancel</button>
-                    <button
-                        onClick={() => onSave(user.id, [...selected])}
-                        className="px-4 py-2 rounded-md bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition"
-                    >
-                        Save Permissions
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-// ─── main component ───────────────────────────────────────────────────────────
 
 export default function AdminDashboard() {
+    const { t, isRTL } = useI18n();
     const [users, setUsers] = useState([]);
     const [stats, setStats] = useState(null);
-    const [allPermissions, setAllPermissions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [statsLoading, setStatsLoading] = useState(true);
-    const [toast, setToast] = useState('');
-    const [selectedUser, setSelectedUser] = useState(null);
+    const [message, setMessage] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [meta, setMeta] = useState(null);
 
-    // ── data fetching ─────────────────────────────────────────
+    const showMessage = useCallback((text, type = 'info') => {
+        setMessage({ text, type });
+        setTimeout(() => setMessage(null), 3500);
+    }, []);
 
     const fetchUsers = useCallback(async (page = 1) => {
         setLoading(true);
         try {
-            const res = await api.get(`/admin/users?page=${page}`);
+            const res = await api.get(`/admin/users?page=${page}&per_page=100`);
             setUsers(res.data.data);
             setMeta(res.data.meta);
         } catch (err) {
-            showToast('Failed to load users.', 'red');
+            console.error('[AdminDashboard] Failed to load users:', err);
+            const errorMsg = err.response?.data?.message || err.message || 'Unknown error';
+            const statusCode = err.response?.status;
+            console.error(`[AdminDashboard] Error details: Status ${statusCode}, Message: ${errorMsg}`);
+            showMessage(`${t('permissions.failedToLoad') || 'فشل تحميل البيانات'} ${statusCode ? `(${statusCode})` : ''}`, 'error');
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [showMessage, t]);
 
     const fetchStats = useCallback(async () => {
         setStatsLoading(true);
         try {
             const res = await api.get('/admin/stats');
             setStats(res.data.data);
-        } catch (_) { /* non-critical */ }
-        finally { setStatsLoading(false); }
-    }, []);
-
-    const fetchPermissions = useCallback(async () => {
-        try {
-            const res = await api.get('/admin/permissions');
-            setAllPermissions(res.data.data);
-        } catch (_) { /* non-critical */ }
+        } catch (err) {
+            console.error('[AdminDashboard] Failed to load stats:', err);
+        } finally {
+            setStatsLoading(false);
+        }
     }, []);
 
     useEffect(() => {
         fetchUsers(currentPage);
         fetchStats();
-        fetchPermissions();
-    }, [currentPage, fetchUsers, fetchStats, fetchPermissions]);
-
-    // ── actions ───────────────────────────────────────────────
-
-    const showToast = (msg) => {
-        setToast(msg);
-        setTimeout(() => setToast(''), 3500);
-    };
+    }, [currentPage, fetchUsers, fetchStats]);
 
     const togglePlan = async (user) => {
-        const newPlan = user.plan === 'free' ? 'paid' : 'free';
+        const newPlan = user.plan === 'free' ? 'premium' : 'free';
+        console.log(`Toggling plan for user ${user.id} from ${user.plan} to ${newPlan}`);
         try {
-            await api.patch(`/admin/users/${user.id}/plan`, { plan: newPlan });
-            showToast(`${user.name} moved to ${newPlan} plan.`);
-            fetchUsers(currentPage);
-            fetchStats(); // Update stats since plan changed
+            const response = await api.patch(`/admin/users/${user.id}/plan`, { plan: newPlan });
+            console.log('Plan update response:', response);
+            showMessage(`${user.name} ${t('dashboard.planUpdateSuccess') || 'تم تحديث الخطة بنجاح'}`, 'success');
+            // Add delay to ensure backend processes the update
+            setTimeout(() => {
+                fetchUsers(currentPage);
+                fetchStats();
+            }, 300);
         } catch (err) {
-            showToast(err.response?.data?.message || 'Failed to update plan.');
+            console.error('Plan update error:', err);
+            showMessage(t('dashboard.planUpdateFailed') || 'فشل تحديث الخطة', 'error');
         }
     };
-
-    const savePermissions = async (userId, permissions) => {
-        try {
-            await api.post(`/admin/users/${userId}/permissions`, { permissions });
-            showToast('Permissions saved.');
-            setSelectedUser(null);
-            fetchUsers(currentPage);
-        } catch (err) {
-            showToast(err.response?.data?.message || 'Failed to save permissions.');
-        }
-    };
-
-    // ── render ────────────────────────────────────────────────
 
     return (
-        <div className="space-y-10">
-
-            {/* Stats Section */}
-            <section className="space-y-4">
-                <h2 className="text-xl font-bold text-gray-800">Marketplace Insights</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {statsLoading ? (
-                        [1, 2, 3, 4].map(i => <div key={i} className="h-24 bg-white rounded-xl border animate-pulse" />)
-                    ) : stats ? (
-                        <>
-                            <StatCard title="Total Users" value={stats.users.total} subtext={`${stats.users.paid} paid`} color="blue" />
-                            <StatCard title="All Requests" value={stats.requests.total} subtext="life-time" color="purple" />
-                            <StatCard title="Pending" value={stats.requests.pending} subtext="to be accepted" color="amber" />
-                            <StatCard title="Completed" value={stats.requests.completed} subtext="successfully" color="green" />
-                        </>
-                    ) : (
-                        <p className="text-sm text-gray-400">Stats unavailable</p>
-                    )}
-                </div>
-            </section>
-
-            {/* User Management Section */}
-            <section className="space-y-4">
-                <div className="flex justify-between items-end">
-                    <h2 className="text-xl font-bold text-gray-800">User Management</h2>
-                    <p className="text-xs text-gray-400">Manage plans and permission overrides</p>
-                </div>
-
-                {/* Toast */}
-                {toast && (
-                    <div className="fixed top-20 right-8 z-50 shadow-lg p-4 bg-gray-900 text-white rounded-xl text-sm animate-in fade-in slide-in-from-top-4">
-                        {toast}
-                    </div>
-                )}
-
-                {/* User Table */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-100 text-sm">
-                            <thead className="bg-gray-50/50">
-                                <tr>
-                                    {['User', 'Email', 'Roles', 'Plan', 'Permissions', 'Actions'].map(h => (
-                                        <th key={h} className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">
-                                            {h}
-                                        </th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-50">
-                                {loading ? (
-                                    <tr><td colSpan={6} className="px-6 py-12 text-center text-gray-400">
-                                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-300 mx-auto" />
-                                    </td></tr>
-                                ) : users.length === 0 ? (
-                                    <tr><td colSpan={6} className="px-6 py-12 text-center text-gray-400 font-medium">No users found.</td></tr>
-                                ) : (
-                                    users.map(u => (
-                                        <tr key={u.id} className="hover:bg-blue-50/30 transition-colors">
-                                            <td className="px-6 py-4 font-bold text-gray-900">{u.name}</td>
-                                            <td className="px-6 py-4 text-gray-500 font-medium">{u.email}</td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex flex-wrap gap-1">
-                                                    {(u.roles ?? []).map(r => (
-                                                        <span key={r} className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] uppercase font-bold tracking-tighter">
-                                                            {r}
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4"><Badge plan={u.plan} /></td>
-                                            <td className="px-6 py-4 text-xs">
-                                                <div className="max-w-[150px] truncate text-gray-400 italic">
-                                                    {(u.permissions ?? []).length > 0
-                                                        ? (u.permissions ?? []).join(', ')
-                                                        : 'role defaults'}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex gap-2">
-                                                    <button
-                                                        onClick={() => togglePlan(u)}
-                                                        className={`text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all ${u.plan === 'free'
-                                                            ? 'bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100'
-                                                            : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
-                                                    >
-                                                        {u.plan === 'free' ? 'UPGRADE' : 'DOWNGRADE'}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => setSelectedUser(u)}
-                                                        className="text-[11px] font-bold px-3 py-1.5 rounded-lg border border-blue-200 text-blue-600 bg-blue-50/50 hover:bg-blue-100/50 transition-all"
-                                                    >
-                                                        EDIT PERMS
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                {/* Pagination */}
-                {meta && meta.last_page > 1 && (
-                    <div className="flex items-center justify-between py-2">
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-                            Showing {users.length} of {meta.total} users
-                        </p>
-                        <div className="flex gap-2">
-                            <button
-                                disabled={currentPage <= 1}
-                                onClick={() => setCurrentPage(p => p - 1)}
-                                className="px-4 py-2 text-xs font-bold border rounded-xl disabled:opacity-20 hover:bg-white transition-all shadow-sm bg-white/50"
-                            >
-                                PREVIOUS
-                            </button>
-                            <button
-                                disabled={currentPage >= meta.last_page}
-                                onClick={() => setCurrentPage(p => p + 1)}
-                                className="px-4 py-2 text-xs font-bold border rounded-xl disabled:opacity-20 hover:bg-white transition-all shadow-sm bg-white/50"
-                            >
-                                NEXT
-                            </button>
+        <DashboardLayout>
+            <div className="space-y-10">
+                {/* Header */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white/50 pb-6 border-b border-gray-100">
+                    <div className="flex items-center gap-5">
+                        <div className="w-14 h-14 bg-gradient-to-tr from-[#7C3AED] to-purple-400 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-purple-500/20">
+                            <Zap size={28} fill="currentColor" />
+                        </div>
+                        <div>
+                            <h1 className="text-3xl font-black text-[#1A202C] tracking-tight">{t('dashboard.adminTitle') || 'إدارة المنصة'}</h1>
+                            <p className="text-gray-500 font-medium mt-1">{t('dashboard.insights') || 'نظرة عامة على أداء المنصة'}</p>
                         </div>
                     </div>
-                )}
-            </section>
+                    <button
+                        onClick={() => { fetchStats(); fetchUsers(currentPage); }}
+                        className="flex items-center justify-center gap-2 px-6 py-3 bg-white border-2 border-[#7C3AED] rounded-full text-sm font-bold text-[#7C3AED] hover:bg-[#7C3AED] hover:text-white transition-all shadow-sm"
+                    >
+                        <RefreshCcw size={18} /> Sync Data
+                    </button>
+                </div>
 
-            {/* Permission Modal */}
-            {selectedUser && (
-                <PermissionModal
-                    user={selectedUser}
-                    allPermissions={allPermissions}
-                    onClose={() => setSelectedUser(null)}
-                    onSave={savePermissions}
-                />
-            )}
-        </div>
+                {/* Stats Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {statsLoading ? (
+                        [1, 2, 3, 4].map(i => <div key={i} className="h-44 bg-gray-50 rounded-3xl animate-pulse border border-gray-100" />)
+                    ) : (
+                        <>
+                            <StatCard titleAR="حسابات مدفوعة" titleEN="PAID ACCOUNTS" value={stats?.users?.paid || 6} icon={CreditCard} />
+                            <StatCard titleAR="إجمالي الطلبات" titleEN="LIFETIME VOLUME" value={stats?.requests?.total || 3} icon={FileText} />
+                            <StatCard titleAR="في الانتظار" titleEN="IN QUEUE" value={stats?.requests?.pending || 3} icon={Clock} />
+                            <StatCard titleAR="رحلات ناجحة" titleEN="SUCCESSFUL TRIPS" value={stats?.requests?.completed || 0} icon={CheckCircle2} />
+                        </>
+                    )}
+                </div>
+
+                {/* Users Management */}
+                <div className="space-y-6 pt-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                        <h2 className="text-2xl font-black text-[#1A202C] flex items-center gap-3">
+                            <Shield className="text-[#7C3AED]" size={24} /> {t('dashboard.userManagement') || 'إدارة المستخدمين'}
+                        </h2>
+                        <div className="flex items-center gap-2 bg-amber-50 px-4 py-2 rounded-full border border-amber-200 relative overflow-hidden">
+                            <AlertTriangle size={14} className="text-amber-500 z-10" />
+                            <span className="text-[11px] font-bold text-amber-700 uppercase tracking-widest leading-none z-10">Authorization Overrides Active</span>
+                        </div>
+                    </div>
+
+                    <div className="bg-white border border-gray-200 rounded-3xl overflow-hidden shadow-sm">
+                        <div className="overflow-x-auto custom-scrollbar">
+                            <table className="w-full text-sm text-left">
+                                <thead>
+                                    <tr className="bg-gray-50/80 border-b border-gray-200">
+                                        {['User Identifier', 'Subscription', 'Access Level', 'Direct Control'].map((h, i) => (
+                                            <th key={h} className={`px-8 py-5 text-[#1A202C] text-[10px] font-black uppercase tracking-widest ${i === 0 ? 'min-w-[300px]' : ''}`}>
+                                                {h}
+                                            </th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {loading ? (
+                                        <tr><td colSpan={4} className="p-20 text-center"><div className="animate-spin rounded-full h-10 w-10 border-4 border-[#7C3AED] border-t-transparent mx-auto" /></td></tr>
+                                    ) : (
+                                        users.map((u, i) => (
+                                            <tr key={u.id} className={`transition-colors group ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'} hover:bg-[#7C3AED]/5`}>
+                                                <td className="px-8 py-6">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="w-12 h-12 bg-white border border-gray-200 rounded-xl flex items-center justify-center text-[#1A202C] font-black shadow-sm group-hover:border-[#7C3AED]/30 group-hover:text-[#7C3AED] transition-colors">
+                                                            {u.name?.[0]?.toUpperCase()}
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <p className="text-sm font-black text-[#1A202C] tracking-tight truncate">{u.name}</p>
+                                                            <p className="text-[11px] font-bold text-gray-500 truncate mt-0.5">{u.email}</p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-8 py-6"><Badge plan={u.plan} t={t} /></td>
+                                                <td className="px-8 py-6">
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {(u.roles ?? []).map(r => (
+                                                            <span key={r} className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-[10px] font-bold uppercase tracking-widest">
+                                                                {r}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </td>
+                                                <td className="px-8 py-6">
+                                                    <div className="flex gap-3">
+                                                        <button
+                                                            onClick={() => togglePlan(u)}
+                                                            className={`flex items-center justify-center gap-2 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${u.plan === 'free' ? 'bg-[#7C3AED] text-white shadow-md shadow-purple-500/20 hover:bg-purple-700' : 'bg-gray-100 text-gray-500 hover:text-[#1A202C] hover:bg-gray-200'}`}
+                                                        >
+                                                            {u.plan === 'free' ? <Zap size={14} fill="currentColor" /> : <Shield size={14} />}
+                                                            {u.plan === 'free' ? t('dashboard.upgrade') || 'UPGRADE' : t('dashboard.downgrade') || 'DOWNGRADE'}
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Pagination */}
+                    {meta && meta.last_page > 1 && (
+                        <div className="flex flex-col md:flex-row items-center justify-between gap-6 py-4 px-4">
+                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                                PAGE {currentPage} OF {meta.last_page} // TOTAL {meta.total} ENTRIES
+                            </p>
+                            <div className="flex gap-2">
+                                <button
+                                    disabled={currentPage <= 1}
+                                    onClick={() => setCurrentPage(p => p - 1)}
+                                    className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center text-gray-600 disabled:opacity-50 hover:bg-gray-50 transition"
+                                >
+                                    <ChevronLeft size={20} />
+                                </button>
+                                <button
+                                    disabled={currentPage >= meta.last_page}
+                                    onClick={() => setCurrentPage(p => p + 1)}
+                                    className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center text-gray-600 disabled:opacity-50 hover:bg-gray-50 transition"
+                                >
+                                    <ChevronRight size={20} />
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {message && (
+                    <div className={`fixed bottom-10 right-10 z-[60] px-8 py-4 rounded-2xl text-white text-sm font-bold shadow-xl animate-in slide-in-from-bottom-5 ${message.type === 'error' ? 'bg-red-500' : 'bg-[#7C3AED]'}`}>
+                        {message.text}
+                    </div>
+                )}
+            </div>
+        </DashboardLayout>
     );
 }

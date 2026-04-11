@@ -22,33 +22,28 @@ class PaymentService
      */
     public function processPayment(UpgradePlanRequest $request): bool
     {
-        $paymentMethod = $request->payment_method ?? $this->factory->getDefault()->getName();
-        $processor = $this->factory->get($paymentMethod) ?? $this->factory->getDefault();
+        // ...
+    }
+
+    /**
+     * Create a checkout session (redirect URL) for a plan.
+     */
+    public function createCheckoutSession(array $data, ?string $paymentMethod = null): array
+    {
+        $paymentMethod = $paymentMethod ?? $this->factory->getDefault()->getName();
+        $processor = $this->factory->get($paymentMethod);
 
         if (!$processor) {
-            Log::error('Payment processor not found', [
-                'payment_method' => $paymentMethod,
-                'available_processors' => array_keys($this->factory->getAvailable()),
-            ]);
-            return false;
+            throw new \InvalidArgumentException("Payment processor '{$paymentMethod}' not available");
         }
 
-        Log::info('Processing payment', [
-            'payment_method' => $paymentMethod,
-            'processor' => $processor->getName(),
-            'plan' => $request->plan,
-            'amount' => $this->getPlanPrice($request->plan),
-        ]);
+        // Check if processor supports checkout sessions
+        if (method_exists($processor, 'createCheckoutSession')) {
+            return $processor->createCheckoutSession($data);
+        }
 
-        $paymentData = [
-            'amount' => $this->getPlanPrice($request->plan) * 100, // Convert to cents
-            'currency' => 'usd',
-            'payment_method' => $paymentMethod,
-            'plan' => $request->plan,
-            'user_id' => $request->user()->id,
-        ];
-
-        return $processor->process($paymentData);
+        // Fallback or error
+        throw new \Exception("Processor {$paymentMethod} does not support checkout sessions.");
     }
 
     /**

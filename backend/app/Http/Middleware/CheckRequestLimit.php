@@ -18,13 +18,11 @@ class CheckRequestLimit
     {
         $user = $request->user();
 
-        if ($user && $user->plan === 'free') {
-            $count = ServiceRequest::where('customer_id', $user->id)->count();
-            if ($count >= 3) {
-                return response()->json([
-                    'message' => 'Free plan limit reached. Upgrade to create more requests.'
-                ], 403);
-            }
+        if ($user && $user->hasExceededRequestLimit()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Your monthly service request limit has been reached. Please upgrade your plan to create more requests.'
+            ], 403);
         }
 
         return $next($request);

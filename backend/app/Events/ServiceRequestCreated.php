@@ -34,8 +34,8 @@ class ServiceRequestCreated implements ShouldBroadcast
     {
         return [
             new PrivateChannel('service-requests'),
-            new PrivateChannel('customer.' . $this->serviceRequest->customer_id),
-            new PrivateChannel('providers.nearby.' . $this->getGeohash()),
+            new PrivateChannel('user.' . $this->serviceRequest->customer_id),
+            new PrivateChannel('providers'),
         ];
     }
 
@@ -66,20 +66,9 @@ class ServiceRequestCreated implements ShouldBroadcast
                 'name' => $this->serviceRequest->customer->name,
             ],
             'attachments_count' => is_array($this->serviceRequest->attachments) ? count($this->serviceRequest->attachments) : 0,
-            'created_at' => $this->serviceRequest->created_at->toISOString(),
+            'created_at' => $this->serviceRequest->created_at?->toISOString(),
             'metadata' => $this->metadata,
         ];
     }
 
-    /**
-     * Get a simple geohash for nearby provider broadcasting.
-     */
-    protected function getGeohash(): string
-    {
-        // Simple geohash approximation for demo
-        // In production, use a proper geohashing library
-        $lat = (int) ($this->serviceRequest->latitude * 10);
-        $lng = (int) ($this->serviceRequest->longitude * 10);
-        return "{$lat}_{$lng}";
-    }
 }

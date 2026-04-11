@@ -20,8 +20,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'check.permission' => \App\Http\Middleware\CheckPermission::class,
             'check.limit' => \App\Http\Middleware\CheckRequestLimit::class,
             'api.security' => \App\Http\Middleware\ApiSecurityMiddleware::class,
-            'advanced.security' => \App\Http\Middleware\AdvancedSecurityMiddleware::class,
             'rate.limit.plan' => \App\Http\Middleware\RateLimitByPlan::class,
+            'api.auth' => \App\Http\Middleware\ApiAuthMiddleware::class,
         ]);
 
         // Apply CORS to API routes

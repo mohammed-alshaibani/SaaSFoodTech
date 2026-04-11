@@ -62,7 +62,20 @@ class ServiceRequestPolicy
      */
     public function create(User $user): bool
     {
-        return $user->can('request.create');
+        if (!$user->can('request.create')) {
+            return false;
+        }
+
+        // Subscription Gate (Free users can only create up to 3 requests)
+        // No need for over-engineered gating service; simple model check is sufficient for MVP.
+        if ($user->plan === 'free') {
+            $count = ServiceRequest::where('customer_id', $user->id)->count();
+            if ($count >= 3) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

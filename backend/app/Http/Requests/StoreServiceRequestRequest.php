@@ -33,7 +33,7 @@ class StoreServiceRequestRequest extends FormRequest
             'description' => [
                 'required',
                 'string',
-                'min:20',
+                'min:5',
                 'max:5000',
                 'regex:/^[\s\S]*$/',
             ],
@@ -94,7 +94,7 @@ class StoreServiceRequestRequest extends FormRequest
             'title.regex' => 'The title contains invalid characters. Only letters, numbers, and basic punctuation are allowed.',
             
             'description.required' => 'A description is required for the service request.',
-            'description.min' => 'The description must be at least 20 characters long.',
+            'description.min' => 'The description must be at least 5 characters long.',
             'description.max' => 'The description may not be greater than 5000 characters.',
             
             'latitude.required' => 'Latitude is required to determine service location.',

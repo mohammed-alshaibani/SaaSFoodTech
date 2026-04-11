@@ -1,20 +1,13 @@
 'use client';
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-
-const NAV = [
-    { href: '/admin', label: '📊 Dashboard', exact: true },
-    { href: '/admin/permissions', label: '🔐 Permission Control', exact: false },
-];
+import { LogOut, User } from 'lucide-react';
 
 export default function AdminLayout({ children }) {
     const { user, loading, logout } = useAuth();
     const router = useRouter();
-    const pathname = usePathname();
 
     useEffect(() => {
         // middleware.ts is the primary guard; this is a client-side safety net
@@ -25,8 +18,8 @@ export default function AdminLayout({ children }) {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-slate-50">
-                <div className="animate-spin rounded-full h-8 w-8 border-4 border-indigo-500 border-t-transparent" />
+            <div className="min-h-screen flex items-center justify-center bg-white">
+                <div className="animate-spin rounded-full h-8 w-8 border-4 border-[#7C3AED] border-t-transparent" />
             </div>
         );
     }
@@ -36,51 +29,31 @@ export default function AdminLayout({ children }) {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-            {/* Header */}
-            <header className="bg-white dark:bg-slate-900 shadow-sm border-b border-slate-200 dark:border-slate-800">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between h-16 items-center">
-                        <div className="flex items-center gap-8">
-                            <h1 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
-                                🍔 FoodTech Admin
-                            </h1>
-                            <nav className="hidden md:flex gap-1">
-                                {NAV.map(({ href, label, exact }) => {
-                                    const active = exact ? pathname === href : pathname.startsWith(href);
-                                    return (
-                                        <Link
-                                            key={href}
-                                            href={href}
-                                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${active
-                                                    ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
-                                                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
-                                                }`}
-                                        >
-                                            {label}
-                                        </Link>
-                                    );
-                                })}
-                            </nav>
-                        </div>
-                        <div className="flex items-center gap-4">
-                            <span className="text-sm text-slate-500 dark:text-slate-400">
-                                {user.name}
-                            </span>
-                            <button
-                                id="admin-logout-btn"
-                                onClick={logout}
-                                className="text-sm text-red-500 hover:text-red-700 font-medium transition-colors"
-                            >
-                                Logout
-                            </button>
-                        </div>
+        <div className="min-h-screen bg-[#F8FAFC] text-[#1E293B] font-sans">
+            {/* Clean Top Navbar */}
+            <header className="px-6 py-4 flex justify-between items-center bg-white border-b border-gray-100">
+                <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Admin Portal</span>
+                </div>
+                <div className="flex items-center gap-4">
+                    <span className="text-sm font-semibold text-[#1E293B]">
+                        {user?.name || 'Admin User'}
+                    </span>
+                    <div className="w-9 h-9 rounded-full bg-[#7C3AED]/10 flex items-center justify-center text-[#7C3AED]">
+                        <User size={18} />
                     </div>
+                    <button
+                        onClick={logout}
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    >
+                        <LogOut size={16} />
+                        <span className="hidden sm:inline">تسجيل الخروج</span>
+                    </button>
                 </div>
             </header>
 
             {/* Main Content */}
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <main>
                 {children}
             </main>
         </div>

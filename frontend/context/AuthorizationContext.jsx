@@ -3,6 +3,31 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthenticationContext';
 
+// Permission cache with TTL (5 minutes)
+const PERMISSION_CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
+let permissionCache = {
+    data: null,
+    timestamp: 0
+};
+
+/**
+ * Invalidate permission cache - call this when permissions change
+ */
+export function invalidatePermissionCache() {
+    permissionCache = {
+        data: null,
+        timestamp: 0
+    };
+}
+
+/**
+ * Check if cache is valid
+ */
+function isCacheValid() {
+    if (!permissionCache.data) return false;
+    return Date.now() - permissionCache.timestamp < PERMISSION_CACHE_TTL;
+}
+
 // Types
 /**
  * @typedef {Object} Permission
@@ -20,13 +45,9 @@ const AuthorizationContext = createContext(undefined);
 
 // Authorization Service Class
 class AuthorizationService {
-    constructor() {
-        this.roleHierarchy = {
-            'admin': 4,
-            'provider_admin': 3,
-            'provider_employee': 2,
-            'customer': 1,
-        };
+    constructor(hierarchyData = null) {
+        // Build hierarchy map from backend data or fallback to hardcoded
+        this.roleHierarchy = this.buildHierarchyMap(hierarchyData);
 
         this.dashboardPaths = {
             'admin': '/dashboard/admin',
@@ -34,6 +55,70 @@ class AuthorizationService {
             'provider_employee': '/dashboard/provider',
             'customer': '/dashboard/customer',
         };
+    }
+
+    buildHierarchyMap(hierarchyData) {
+        if (!hierarchyData || !Array.isArray(hierarchyData)) {
+            // Fallback to hardcoded hierarchy if no data
+            return {
+                'admin': 4,
+                'provider_admin': 3,
+                'provider_employee': 2,
+                'customer': 1,
+            };
+        }
+
+        // Build level map from hierarchy tree
+        const levelMap = {};
+        const traverse = (roles, level) => {
+            roles.forEach(role => {
+                levelMap[role.name] = level;
+                if (role.childRoles && role.childRoles.length > 0) {
+                    traverse(role.childRoles, level + 1);
+                }
+            });
+        };
+
+        traverse(hierarchyData, 1);
+        return levelMap;
+    }
+
+    getInheritedRoles(userRoles, hierarchyData) {
+        if (!hierarchyData || !Array.isArray(hierarchyData)) return userRoles;
+
+        const inherited = new Set(userRoles);
+        const allRoles = [];
+
+        const traverse = (roles) => {
+            roles.forEach(role => {
+                allRoles.push(role);
+                if (role.childRoles && role.childRoles.length > 0) {
+                    traverse(role.childRoles);
+                }
+            });
+        };
+
+        traverse(hierarchyData);
+
+        // Find user's roles and add their children
+        userRoles.forEach(userRole => {
+            const findAndAddChildren = (roles) => {
+                roles.forEach(role => {
+                    if (role.name === userRole && role.childRoles) {
+                        role.childRoles.forEach(child => {
+                            inherited.add(child.name);
+                            findAndAddChildren([child]);
+                        });
+                    }
+                    if (role.childRoles) {
+                        findAndAddChildren(role.childRoles);
+                    }
+                });
+            };
+            findAndAddChildren(hierarchyData);
+        });
+
+        return Array.from(inherited);
     }
 
     hasRole(userRoles, requiredRole) {
@@ -67,6 +152,90 @@ class AuthorizationService {
         if (!userPermissions || !Array.isArray(userPermissions)) return false;
         
         return userPermissions.includes(requiredPermission);
+    }
+
+    hasPermissionWithContext(userPermissions, requiredPermission, context = {}) {
+        if (!userPermissions || !Array.isArray(userPermissions)) return false;
+        
+        // Check if user has the base permission
+        if (!userPermissions.includes(requiredPermission)) {
+            return false;
+        }
+
+        // If no scope context, permission check passes
+        if (!context || !context.scope) {
+            return true;
+        }
+
+        // Handle scoped permission checks
+        switch (context.scope) {
+            case 'self':
+                return this.checkSelfScope(context);
+            case 'location':
+                return this.checkLocationScope(context);
+            case 'department':
+                return this.checkDepartmentScope(context);
+            case 'team':
+                return this.checkTeamScope(context);
+            default:
+                return true;
+        }
+    }
+
+    checkSelfScope(context) {
+        if (!context.resource || !context.userId) return true;
+        
+        // Check if resource belongs to user
+        if (context.resource.customer_id === context.userId) return true;
+        if (context.resource.provider_id === context.userId) return true;
+        if (context.resource.id === context.resourceId) return true;
+        
+        return false;
+    }
+
+    checkLocationScope(context) {
+        if (!context.userLocation || !context.resourceLocation) return true;
+        
+        const distance = this.calculateDistance(
+            context.userLocation.lat,
+            context.userLocation.lng,
+            context.resourceLocation.lat,
+            context.resourceLocation.lng
+        );
+        
+        const maxDistance = context.maxDistance || 50; // Default 50km
+        return distance <= maxDistance;
+    }
+
+    checkDepartmentScope(context) {
+        if (!context.userDepartment || !context.allowedDepartments) return true;
+        
+        return context.allowedDepartments.includes(context.userDepartment);
+    }
+
+    checkTeamScope(context) {
+        if (!context.userTeamId || !context.allowedTeams) return true;
+        
+        return context.allowedTeams.includes(context.userTeamId);
+    }
+
+    calculateDistance(lat1, lon1, lat2, lon2) {
+        const earthRadius = 6371; // Earth's radius in kilometers
+
+        const dLat = this.toRad(lat2 - lat1);
+        const dLon = this.toRad(lon2 - lon1);
+
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                  Math.cos(this.toRad(lat1)) * Math.cos(this.toRad(lat2)) *
+                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return earthRadius * c;
+    }
+
+    toRad(degrees) {
+        return degrees * (Math.PI / 180);
     }
 
     canAccessRoute(userRoles, route) {
@@ -136,16 +305,36 @@ export function AuthorizationProvider({ children }) {
     const [permissions, setPermissions] = useState([]);
     const [roles, setRoles] = useState([]);
     const [authorizationLoading, setAuthorizationLoading] = useState(false);
+    const [roleHierarchy, setRoleHierarchy] = useState(null);
+    const [hierarchyLoading, setHierarchyLoading] = useState(false);
 
-    const authService = new AuthorizationService();
+    const authService = new AuthorizationService(roleHierarchy);
+
+    // Note: Role hierarchy fetch disabled - /api/roles/hierarchy endpoint not implemented in backend
 
     useEffect(() => {
         if (isAuthenticated && user) {
-            setPermissions(user.permissions || []);
-            setRoles(user.roles || []);
+            // Use cache if valid, otherwise update from user data
+            if (isCacheValid() && permissionCache.data) {
+                setPermissions(permissionCache.data.permissions || []);
+                setRoles(permissionCache.data.roles || []);
+            } else {
+                const newPermissions = user.permissions || [];
+                const newRoles = user.roles || [];
+                setPermissions(newPermissions);
+                setRoles(newRoles);
+                
+                // Update cache
+                permissionCache = {
+                    data: { permissions: newPermissions, roles: newRoles },
+                    timestamp: Date.now()
+                };
+            }
         } else {
             setPermissions([]);
             setRoles([]);
+            // Clear cache on logout
+            invalidatePermissionCache();
         }
     }, [isAuthenticated, user]);
 
@@ -170,6 +359,18 @@ export function AuthorizationProvider({ children }) {
         return authService.hasPermission(permissions, permission);
     }, [permissions]);
 
+    const hasPermissionWithContext = useCallback((permission, context) => {
+        return authService.hasPermissionWithContext(permissions, permission, context);
+    }, [permissions]);
+
+    const canAccessOwnResource = useCallback((resource, userId) => {
+        return authService.checkSelfScope({ resource, userId });
+    }, []);
+
+    const canAccessWithinLocation = useCallback((userLocation, resourceLocation, maxDistance) => {
+        return authService.checkLocationScope({ userLocation, resourceLocation, maxDistance });
+    }, []);
+
     const canAccessRoute = useCallback((route) => {
         return authService.canAccessRoute(roles, route);
     }, [roles]);
@@ -192,6 +393,8 @@ export function AuthorizationProvider({ children }) {
     }, [roles]);
 
     const isAdmin = useCallback(() => {
+        // Check if user has admin role - this is dynamic based on backend response
+        // The backend's Gate::before grants admin all permissions
         return authService.hasRole('admin');
     }, [roles]);
 
@@ -199,11 +402,27 @@ export function AuthorizationProvider({ children }) {
         return authService.hasRole('customer');
     }, [roles]);
 
+    const getAllPermissions = useCallback(() => {
+        // Get permissions including inherited from role hierarchy
+        const inheritedRoles = authService.getInheritedRoles(roles, roleHierarchy);
+        const allPermissions = new Set(permissions);
+        
+        // If backend returns permissions for all roles including inherited, use that
+        // Otherwise, this would need to fetch permissions for inherited roles
+        return Array.from(allPermissions);
+    }, [roles, permissions, roleHierarchy, authService]);
+
+    const getInheritedRoles = useCallback(() => {
+        return authService.getInheritedRoles(roles, roleHierarchy);
+    }, [roles, roleHierarchy, authService]);
+
     const value = {
         // State
         permissions,
         roles,
         authorizationLoading,
+        hierarchyLoading,
+        roleHierarchy,
 
         // Permission checking
         hasRole,
@@ -211,12 +430,22 @@ export function AuthorizationProvider({ children }) {
         hasAllRoles,
         hasMinimumRole,
         hasPermission,
+        hasPermissionWithContext,
+        canAccessOwnResource,
+        canAccessWithinLocation,
         canAccessRoute,
 
         // Role checking
         isProvider,
         isAdmin,
         isCustomer,
+
+        // Hierarchy methods
+        getAllPermissions,
+        getInheritedRoles,
+
+        // Cache management
+        invalidatePermissionCache,
 
         // Utilities
         getDashboardPath,

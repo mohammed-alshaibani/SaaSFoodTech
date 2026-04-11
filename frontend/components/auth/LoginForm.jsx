@@ -55,8 +55,12 @@ export default function LoginForm() {
       const result = await login(formData);
 
       if (result.success) {
+        // Check for redirect parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        const redirectPath = urlParams.get('redirect');
+
         const dashboardPath = getDashboardPath();
-        router.push(dashboardPath || '/dashboard/customer');
+        router.push(redirectPath || dashboardPath || '/dashboard/customer');
       } else {
         setErrors({ general: result.error });
       }

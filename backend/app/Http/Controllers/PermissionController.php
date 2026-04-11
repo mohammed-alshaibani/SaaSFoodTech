@@ -18,45 +18,24 @@ class PermissionController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Permission::with(['category', 'permissionScopes']);
+        $query = Permission::query();
 
-        // Filter by category
-        if ($request->has('category_id')) {
-            $query->byCategory($request->category_id);
-        }
-
-        // Filter by group
-        if ($request->has('group')) {
-            $query->byGroup($request->group);
-        }
-
-        // Filter by type (system/custom)
-        if ($request->has('type')) {
-            if ($request->type === 'system') {
-                $query->system();
-            } elseif ($request->type === 'custom') {
-                $query->custom();
-            }
-        }
-
-        // Search by name or description
+        // Search by name
         if ($request->has('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('description', 'like', "%{$search}%");
-            });
+            $query->where('name', 'like', "%{$request->search}%");
         }
 
-        $permissions = $query->orderBy('category_id')
-            ->orderBy('group')
-            ->orderBy('name')
+        $permissions = $query->orderBy('name')
             ->paginate($request->get('per_page', 15));
 
         return response()->json([
-            'permissions' => $permissions,
-            'categories' => PermissionCategory::ordered()->get(),
-            'groups' => Permission::distinct()->pluck('group')->filter(),
+            'data' => $permissions->items(),
+            'meta' => [
+                'current_page' => $permissions->currentPage(),
+                'last_page' => $permissions->lastPage(),
+                'per_page' => $permissions->perPage(),
+                'total' => $permissions->total(),
+            ]
         ]);
     }
 
@@ -66,47 +45,21 @@ class PermissionController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:permissions,name',
-            'description' => 'nullable|string',
-            'group' => 'nullable|string|max:100',
-            'category_id' => 'nullable|exists:permission_categories,id',
-            'is_system' => 'boolean',
-            'scopes' => 'nullable|array',
-            'scopes.*.scope_type' => 'required|string|in:location,department,team,self',
-            'scopes.*.scope_values' => 'required|array',
+            'name' => 'required|string|max:255|unique:permissions,name,NULL,id,guard_name,sanctum',
         ]);
 
         try {
-            DB::beginTransaction();
-
-            $permission = Permission::create([
-                'name' => $validated['name'],
-                'description' => $validated['description'] ?? null,
-                'group' => $validated['group'] ?? null,
-                'category_id' => $validated['category_id'] ?? null,
-                'is_system' => $validated['is_system'] ?? false,
-                'guard_name' => 'api',
-            ]);
-
-            // Create scopes if provided
-            if (!empty($validated['scopes'])) {
-                foreach ($validated['scopes'] as $scopeData) {
-                    $permission->permissionScopes()->create([
-                        'scope_type' => $scopeData['scope_type'],
-                        'scope_values' => $scopeData['scope_values'],
-                    ]);
-                }
-            }
-
-            DB::commit();
+            $permission = Permission::firstOrCreate(
+                ['name' => $validated['name'], 'guard_name' => 'sanctum'],
+                ['guard_name' => 'sanctum']
+            );
 
             return response()->json([
                 'message' => 'Permission created successfully',
-                'permission' => $permission->load(['category', 'scopes'])
+                'permission' => $permission
             ], 201);
 
         } catch (\Exception $e) {
-            DB::rollBack();
             return response()->json([
                 'error' => 'Failed to create permission',
                 'message' => $e->getMessage()
@@ -119,8 +72,6 @@ class PermissionController extends Controller
      */
     public function show(Permission $permission): JsonResponse
     {
-        $permission->load(['category', 'permissionScopes']);
-
         return response()->json(['permission' => $permission]);
     }
 
@@ -129,55 +80,24 @@ class PermissionController extends Controller
      */
     public function update(Request $request, Permission $permission): JsonResponse
     {
-        if ($permission->is_system) {
-            return response()->json([
-                'error' => 'Forbidden',
-                'message' => 'System permissions cannot be modified'
-            ], 403);
-        }
-
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255', Rule::unique('permissions')->ignore($permission->id)],
-            'description' => 'nullable|string',
-            'group' => 'nullable|string|max:100',
-            'category_id' => 'nullable|exists:permission_categories,id',
-            'scopes' => 'nullable|array',
-            'scopes.*.scope_type' => 'required|string|in:location,department,team,self',
-            'scopes.*.scope_values' => 'required|array',
+            'name' => ['required', 'string', 'max:255', Rule::unique('permissions')->ignore($permission->id)->where('guard_name', 'sanctum')],
         ]);
 
         try {
-            DB::beginTransaction();
-
-            $oldValues = $permission->toArray();
-
             $permission->update([
                 'name' => $validated['name'],
-                'description' => $validated['description'] ?? null,
-                'group' => $validated['group'] ?? null,
-                'category_id' => $validated['category_id'] ?? null,
             ]);
 
-            // Update scopes
-            if (isset($validated['scopes'])) {
-                $permission->permissionScopes()->delete();
-                foreach ($validated['scopes'] as $scopeData) {
-                    $permission->permissionScopes()->create([
-                        'scope_type' => $scopeData['scope_type'],
-                        'scope_values' => $scopeData['scope_values'],
-                    ]);
-                }
-            }
-
-            DB::commit();
+            // Clear Spatie permission cache
+            app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
 
             return response()->json([
                 'message' => 'Permission updated successfully',
-                'permission' => $permission->fresh()->load(['category', 'scopes'])
+                'permission' => $permission->fresh()
             ]);
 
         } catch (\Exception $e) {
-            DB::rollBack();
             return response()->json([
                 'error' => 'Failed to update permission',
                 'message' => $e->getMessage()
@@ -188,68 +108,30 @@ class PermissionController extends Controller
     /**
      * Remove the specified permission.
      */
-    public function destroy(Permission $permission): JsonResponse
+    public function destroy($id): JsonResponse
     {
-        if ($permission->is_system) {
-            return response()->json([
-                'error' => 'Forbidden',
-                'message' => 'System permissions cannot be deleted'
-            ], 403);
-        }
-
         try {
-            DB::beginTransaction();
+            // Check if permission exists without loading model
+            $permission = \DB::table('permissions')->where('id', $id)->first();
 
-            $oldValues = $permission->toArray();
+            if (!$permission) {
+                return response()->json([
+                    'error' => 'Permission not found'
+                ], 404);
+            }
 
-            $permission->permissionScopes()->delete();
-            $permission->delete();
-
-            DB::commit();
+            // Delete directly without loading model
+            \DB::table('permissions')->where('id', $id)->delete();
 
             return response()->json([
                 'message' => 'Permission deleted successfully'
             ]);
 
         } catch (\Exception $e) {
-            DB::rollBack();
             return response()->json([
                 'error' => 'Failed to delete permission',
                 'message' => $e->getMessage()
             ], 500);
         }
     }
-
-    /**
-     * Get permission categories.
-     */
-    public function categories(): JsonResponse
-    {
-        $categories = PermissionCategory::withCount('permissions')
-            ->ordered()
-            ->get();
-
-        return response()->json(['categories' => $categories]);
-    }
-
-    /**
-     * Store a new permission category.
-     */
-    public function storeCategory(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:permission_categories,name',
-            'description' => 'nullable|string',
-            'icon' => 'nullable|string|max:50',
-            'sort_order' => 'integer|min:0',
-        ]);
-
-        $category = PermissionCategory::create($validated);
-
-        return response()->json([
-            'message' => 'Category created successfully',
-            'category' => $category
-        ], 201);
-    }
-
 }

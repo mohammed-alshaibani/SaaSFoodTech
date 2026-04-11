@@ -14,6 +14,21 @@ class MockPaymentProcessor implements PaymentProcessorInterface
     }
 
     /**
+     * Create a simulated checkout session URL.
+     */
+    public function createCheckoutSession(array $data): array
+    {
+        // For simulation, we point to a mock success route
+        return [
+            'url' => route('subscription.simulate.success', [
+                'subscription_id' => $data['subscription_id'],
+                'auth_token' => md5($data['subscription_id'] . config('app.key'))
+            ]),
+            'id' => 'mock_session_' . uniqid()
+        ];
+    }
+
+    /**
      * Refund a simulated transaction.
      */
     public function refund(string $transactionId, ?string $reason = null): bool

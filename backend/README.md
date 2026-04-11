@@ -155,16 +155,17 @@ The RBAC system is designed to be flexible and dynamic:
 - **Redis**: High-performance caching and queue management
 
 ### Trade-offs
-- **Simplicity over Complexity**: Focused on core features first
-- **Monolithic Architecture**: Suitable for MVP scale
-- **Mock Payment Integration**: Simplified subscription model
-- **AI Integration**: External API calls with fallback logic
+- **Simplicity over Complexity**: Prioritized core request lifecycle and geolocation over complex UI features like maps.
+- **Monolithic Architecture**: Chose a single Laravel backend for ease of deployment and lower overhead for an MVP.
+- **Mock Payment Integration**: Provided a flexible `PaymentProcessorInterface` but only implemented a `MockPaymentProcessor` to avoid external dependencies while showing extensibility.
+- **AI Integration**: Implemented AI features synchronously in controllers for immediate feedback, though background jobs are available for scaling.
+- **Security Middleware**: Balanced between aggressive security (SQLi/XSS prevention) and system usability, choosing to implement custom regex-based filters for immediate protection.
 
 ### Performance Considerations
-- **Database Indexing**: Optimized for geolocation queries
-- **Caching Strategy**: Redis for frequently accessed data
-- **Queue Processing**: Async operations for better response times
-- **Rate Limiting**: Subscription-based API throttling
+- **Database Indexing**: Optimized for geolocation queries using latitude/longitude indexing.
+- **Caching Strategy**: Redis used for frequently accessed configuration and basic rate limiting.
+- **Queue Processing**: Prepared for async operations (AI, Notifications) to keep user interaction snappy.
+- **Rate Limiting**: Implemented multi-tier rate limiting (global, per-plan, and AI-specific).
 
 ## 📚 API Documentation
 

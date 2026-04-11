@@ -10,13 +10,11 @@ use Illuminate\Support\Facades\Auth;
 
 use Spatie\Permission\Traits\HasRoles;
 use Laravel\Sanctum\HasApiTokens;
-use App\Services\Subscription\PlanResolverManager;
+
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable, HasRoles {
-        hasPermissionTo as traitHasPermissionTo;
-    }
+    use HasApiTokens, HasFactory, Notifiable, HasRoles;
 
     /**
      * The attributes that are mass assignable.
@@ -96,138 +94,19 @@ class User extends Authenticatable
         )->active();
     }
 
-    /**
-     * Get direct user permissions.
-     */
-    public function userPermissions()
-    {
-        return $this->hasMany(UserPermission::class);
-    }
-
-    /**
-     * Get active direct user permissions.
-     */
-    public function activeUserPermissions()
-    {
-        return $this->userPermissions()->active();
-    }
-
-    /**
-     * Check if user has permission (including direct user permissions).
-     */
-    public function hasPermissionTo($permission, $guardName = null): bool
-    {
-        // Check role-based permissions first
-        if ($this->traitHasPermissionTo($permission, $guardName)) {
-            return true;
-        }
-
-        // Check direct user permissions
-        $permissionName = is_string($permission) ? $permission : $permission->name;
-
-        $userPermission = $this->activeUserPermissions()
-            ->whereHas('permission', function ($query) use ($permissionName) {
-                $query->where('name', $permissionName);
-            })
-            ->first();
-
-        if ($userPermission) {
-            return $userPermission->type === 'grant';
-        }
-
-        return false;
-    }
-
-    /**
-     * Grant direct permission to user.
-     */
-    public function grantPermission($permission, $reason = null, $expiresAt = null, $grantedBy = null)
-    {
-        $permissionModel = is_string($permission)
-            ? Permission::where('name', $permission)->first()
-            : $permission;
-
-        if (!$permissionModel) {
-            return null;
-        }
-
-        return $this->userPermissions()->updateOrCreate(
-            ['permission_id' => $permissionModel->id],
-            [
-                'type' => 'grant',
-                'reason' => $reason,
-                'expires_at' => $expiresAt,
-                'granted_by' => $grantedBy ?? (Auth::check() ? Auth::id() : null),
-            ]
-        );
-    }
-
-    /**
-     * Deny direct permission to user.
-     */
-    public function denyPermission($permission, $reason = null, $expiresAt = null, $grantedBy = null)
-    {
-        $permissionModel = is_string($permission)
-            ? Permission::where('name', $permission)->first()
-            : $permission;
-
-        if (!$permissionModel) {
-            return null;
-        }
-
-        return $this->userPermissions()->updateOrCreate(
-            ['permission_id' => $permissionModel->id],
-            [
-                'type' => 'deny',
-                'reason' => $reason,
-                'expires_at' => $expiresAt,
-                'granted_by' => $grantedBy ?? (Auth::check() ? Auth::id() : null),
-            ]
-        );
-    }
-
-    /**
-     * Remove direct permission from user.
-     */
-    public function removeDirectPermission($permission)
-    {
-        $permissionModel = is_string($permission)
-            ? Permission::where('name', $permission)->first()
-            : $permission;
-
-        if (!$permissionModel) {
-            return false;
-        }
-
-        return $this->userPermissions()->where('permission_id', $permissionModel->id)->delete();
-    }
-
-    /**
-     * Get all effective permissions (roles + direct user permissions).
-     */
-    public function getAllEffectivePermissions()
-    {
-        $rolePermissions = $this->getAllPermissions();
-
-        $directPermissions = $this->activeUserPermissions()
-            ->with('permission')
-            ->get()
-            ->map(function ($userPermission) {
-                return $userPermission->type === 'grant'
-                    ? $userPermission->permission
-                    : null;
-            })
-            ->filter();
-
-        return $rolePermissions->merge($directPermissions)->unique('id');
-    }
+    // Spatie HasRoles provides all permission logic intrinsically.
 
     /**
      * Get the user's current plan name using strategy pattern.
      */
     public function getCurrentPlan(): string
     {
-        return PlanResolverManager::resolve($this);
+        $activeSubscription = $this->activeSubscription();
+        if ($activeSubscription && $activeSubscription->subscriptionPlan) {
+            return $activeSubscription->subscriptionPlan->name;
+        }
+
+        return $this->plan ?? 'free';
     }
 
     /**

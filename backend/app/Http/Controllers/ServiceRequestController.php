@@ -81,7 +81,7 @@ class ServiceRequestController extends Controller
         // Delegate to central MainService
         $serviceRequest = $mainService->createServiceRequest($dto, $request->user()->id);
 
-        // Fire native events (or rely on Observer)
+        // Fire real-time broadcast event
         ServiceRequestCreated::dispatch($serviceRequest);
 
         // AI Enhancement (if requested)
@@ -124,7 +124,7 @@ class ServiceRequestController extends Controller
         // Delegate to MainService
         $serviceRequest = $mainService->acceptServiceRequest($serviceRequest, $request->user()->id);
 
-        // Fire native event
+        // Fire real-time broadcast event
         ServiceRequestAccepted::dispatch($serviceRequest, $request->user()->id);
 
         return response()->json([
@@ -144,8 +144,8 @@ class ServiceRequestController extends Controller
         // Delegate to MainService
         $serviceRequest = $mainService->completeServiceRequest($serviceRequest);
 
-        // Fire native event
-        ServiceRequestCompleted::dispatch($serviceRequest, $request->user()->id);
+        // Fire real-time broadcast event
+        ServiceRequestCompleted::dispatch($serviceRequest);
 
         return response()->json([
             'message' => 'Service request completed successfully',
@@ -204,15 +204,22 @@ class ServiceRequestController extends Controller
     private function enhanceWithAI(ServiceRequest $serviceRequest): void
     {
         try {
+            // Check if API key is configured
+            $apiKey = config('services.gemini.api_key');
+            
+            if (!$apiKey || $apiKey === 'your_gemini_api_key_here') {
+                throw new \Exception('Gemini API key not configured.');
+            }
+
             // Simple AI enhancement (direct API call)
-            $client = new \GuzzleHttp\Client();
-            $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' . config('services.gemini.api_key'), [
+            $client = new \GuzzleHttp\Client(['timeout' => 10]);
+            $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' . $apiKey, [
                 'json' => [
                     'contents' => [
                         [
                             'parts' => [
                                 [
-                                    'text' => "Enhance this service request description for clarity and professionalism: " . $serviceRequest->description
+                                    'text' => "Enhance this service request description for clarity and professionalism. Keep the original meaning but make it sound more like a professional work order. Return ONLY the enhanced text: " . $serviceRequest->description
                                 ]
                             ]
                         ]
@@ -223,12 +230,33 @@ class ServiceRequestController extends Controller
             $data = json_decode($response->getBody(), true);
             if (isset($data['candidates'][0]['content']['parts'][0]['text'])) {
                 $serviceRequest->update([
-                    'description' => $data['candidates'][0]['content']['parts'][0]['text']
+                    'description' => trim($data['candidates'][0]['content']['parts'][0]['text'])
                 ]);
+                return; // Success
             }
         } catch (\Exception $e) {
-            // Log error but don't fail the request
-            \Log::error('AI enhancement failed: ' . $e->getMessage());
+            \Log::warning('External AI enhancement failed, using local fallback: ' . $e->getMessage());
         }
+
+        // --- Local Fallback Logic ---
+        // If external AI is unavailable, we apply a static "professionalizer"
+        $original = $serviceRequest->description;
+        
+        $replacements = [
+            'fix' => 'repair and restore',
+            'broken' => 'malfunctioning',
+            'help' => 'assistance required for',
+            'wont' => 'fails to',
+            'bad' => 'non-functional',
+            'fast' => 'as soon as possible',
+        ];
+
+        $enhanced = str_ireplace(array_keys($replacements), array_values($replacements), $original);
+        $enhanced = ucfirst(trim($enhanced));
+        if (!fnmatch('*[.!]', $enhanced)) { $enhanced .= '.'; }
+
+        $serviceRequest->update([
+            'description' => "Professional Request: {$enhanced}"
+        ]);
     }
 }

@@ -28,12 +28,22 @@ class AuthController extends Controller
 
         // Role assignment logic
         $role = $request->role;
+        
+        // Log the received role for debugging
+        \Log::info('Registration role assignment', [
+            'requested_role' => $role,
+            'user_id' => $user->id
+        ]);
+        
         if ($role === 'provider')
             $role = 'provider_admin';
-        if (!in_array($role, ['admin', 'provider_admin', 'customer']))
+        
+        // Ensure only valid roles are assigned
+        $validRoles = ['admin', 'provider_admin', 'customer'];
+        if (!in_array($role, $validRoles))
             $role = 'customer';
 
-        $user->assignRole($role);
+        $user->assignRole($role, 'sanctum');
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
@@ -103,20 +113,21 @@ class AuthController extends Controller
         $user->load('roles');
 
         $requestCount = $user->hasRole('customer')
-            ? ServiceRequest::where('customer_id', $user->id)->count()
+            ? \App\Models\ServiceRequest::where('customer_id', $user->id)->count()
             : 0;
 
+        $currentPlan = $user->getCurrentPlan();
         $freeLimit = 3;
 
         return [
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
-            'plan' => $user->plan,
+            'plan' => $currentPlan,
             'roles' => $user->roles->pluck('name'),
-            'permissions' => $user->getAllEffectivePermissions()->pluck('name'),
+            'permissions' => $user->getAllPermissions()->pluck('name'),
             'request_count' => $requestCount,
-            'limit_reached' => $user->plan === 'free' && $requestCount >= $freeLimit,
+            'limit_reached' => $user->hasExceededRequestLimit(),
             'free_limit' => $freeLimit,
         ];
     }

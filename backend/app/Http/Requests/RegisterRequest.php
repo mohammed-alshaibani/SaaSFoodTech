@@ -76,6 +76,7 @@ class RegisterRequest extends FormRequest
             'password.min' => 'يجب أن تكون كلمة المرور 8 أحرف على الأقل.',
             'password.confirmed' => 'تأكيد كلمة المرور غير متطابق.',
             'password.regex' => 'يجب أن تحتوي كلمة المرور على حرف كبير (A-Z)، وحرف صغير (a-z)، ورقم (0-9)، ورمز خاص (@$!%*?&).',
+            'password_confirmation.required' => 'تأكيد كلمة المرور مطلوب.',
             'role.required' => 'يرجى اختيار نوع الحساب (عميل أو مزود خدمة).',
             'role.in' => 'نوع الحساب المختار غير صالح.',
             'company_name.required_if' => 'اسم الشركة مطلوب عند التسجيل كمزود خدمة.',

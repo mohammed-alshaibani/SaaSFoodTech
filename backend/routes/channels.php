@@ -25,3 +25,9 @@ Broadcast::channel('user.{id}', function ($user, $id) {
 Broadcast::channel('service-requests', function ($user) {
     return $user->hasRole('admin');
 });
+
+// ── Shared providers channel ───────────────────────────────────────────────
+// All authenticated providers peuvent listen to this for new requests.
+Broadcast::channel('providers', function ($user) {
+    return $user->hasRole(['provider_admin', 'provider_employee']);
+});

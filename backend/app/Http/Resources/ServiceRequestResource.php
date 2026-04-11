@@ -31,8 +31,8 @@ class ServiceRequestResource extends JsonResource
             'provider' => new UserResource($this->whenLoaded('provider')),
             'attachments' => $this->attachments ?? [],
 
-            'created_at' => $this->created_at->toIso8601String(),
-            'updated_at' => $this->updated_at->toIso8601String(),
+            'created_at' => $this->created_at?->toIso8601String(),
+            'updated_at' => $this->updated_at?->toIso8601String(),
         ];
     }
 }

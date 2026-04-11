@@ -34,9 +34,8 @@ class ServiceRequestAccepted implements ShouldBroadcast
     {
         return [
             new PrivateChannel('service-requests'),
-            new PrivateChannel('customer.' . $this->serviceRequest->customer_id),
-            new PrivateChannel('provider.' . $this->providerId),
             new PrivateChannel('user.' . $this->serviceRequest->customer_id),
+            new PrivateChannel('user.' . $this->providerId),
         ];
     }
 
@@ -57,7 +56,7 @@ class ServiceRequestAccepted implements ShouldBroadcast
             'id' => $this->serviceRequest->id,
             'title' => $this->serviceRequest->title,
             'status' => $this->serviceRequest->status,
-            'accepted_at' => $this->serviceRequest->updated_at->toISOString(),
+            'accepted_at' => $this->serviceRequest->updated_at?->toISOString(),
             'provider' => $this->serviceRequest->provider ? [
                 'id' => $this->serviceRequest->provider->id,
                 'name' => $this->serviceRequest->provider->name,

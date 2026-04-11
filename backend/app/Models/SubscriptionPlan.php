@@ -75,7 +75,8 @@ class SubscriptionPlan extends Model
      */
     public function hasFeature(string $feature): bool
     {
-        return in_array($feature, $this->features ?? []);
+        $features = $this->features ?? [];
+        return isset($features[$feature]) && $features[$feature] === true;
     }
 
     /**

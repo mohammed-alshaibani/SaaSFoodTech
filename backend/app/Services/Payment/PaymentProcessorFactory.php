@@ -87,9 +87,11 @@ class PaymentProcessorFactory
     protected static function getRegisteredProcessors(): array
     {
         return [
-            'stripe' => StripePaymentProcessor::class,
-            'paypal' => PayPalPaymentProcessor::class,
             'mock' => MockPaymentProcessor::class,
+            'credit_card' => MockPaymentProcessor::class,
+            'card' => MockPaymentProcessor::class,
+            'paypal' => MockPaymentProcessor::class,
+            'bank_transfer' => MockPaymentProcessor::class,
         ];
     }
 

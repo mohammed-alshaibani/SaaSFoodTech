@@ -59,6 +59,54 @@ class AdminController extends Controller
     }
 
     /**
+     * POST /api/admin/users
+     * Create a new user from admin dashboard
+     */
+    public function createUser(Request $request): JsonResponse
+    {
+        try {
+            $validated = $request->validate([
+                'name' => 'required|string|max:255',
+                'email' => 'required|email|max:255|unique:users,email',
+                'password' => 'required|string|min:8',
+                'role' => 'nullable|string',
+                'plan' => 'nullable|in:free,premium,enterprise',
+            ]);
+
+            $user = User::create([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'password' => \Illuminate\Support\Facades\Hash::make($validated['password']),
+                'plan' => $validated['plan'] ?? 'free',
+            ]);
+
+            if (isset($validated['role']) && !empty($validated['role'])) {
+                try {
+                    $user->assignRole($validated['role']);
+                } catch (\Exception $e) {
+                    \Log::warning('[AdminController] Role assignment failed in createUser', ['error' => $e->getMessage()]);
+                }
+            }
+
+            return response()->json([
+                'message' => 'User created successfully',
+                'data' => new UserResource($user->load('roles')),
+            ], 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            \Log::error('[AdminController] Create user error: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Failed to create user',
+                'error' => config('app.debug') ? $e->getMessage() : 'Internal server error'
+            ], 500);
+        }
+    }
+
+    /**
      * GET /api/admin/users/{user}
      * Show a single user with roles, permissions, and their service requests summary.
      */
@@ -80,16 +128,55 @@ class AdminController extends Controller
      */
     public function updatePlan(Request $request, User $user): JsonResponse
     {
-        $validated = $request->validate([
-            'plan' => ['required', Rule::in(['free', 'basic', 'paid', 'premium', 'enterprise'])],
-        ]);
+        try {
+            $validated = $request->validate([
+                'plan' => ['required', Rule::in(['free', 'basic', 'paid', 'premium', 'enterprise'])],
+            ]);
 
-        $user->update(['plan' => $validated['plan']]);
+            \Log::info('[AdminController] Updating plan', [
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'current_plan' => $user->plan,
+                'new_plan' => $validated['plan']
+            ]);
 
-        return response()->json([
-            'message' => "User plan updated to [{$validated['plan']}].",
-            'data' => new UserResource($user->load('roles')),
-        ]);
+            $user->plan = $validated['plan'];
+            $user->save();
+
+            \Log::info('[AdminController] Plan updated successfully', [
+                'user_id' => $user->id,
+                'updated_plan' => $user->fresh()->plan
+            ]);
+
+            return response()->json([
+                'message' => "User plan updated to [{$validated['plan']}].",
+                'data' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'plan' => $user->plan,
+                ],
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            \Log::error('[AdminController] Plan update validation error', [
+                'user_id' => $user->id,
+                'errors' => $e->errors()
+            ]);
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            \Log::error('[AdminController] Plan update error', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'message' => 'Failed to update plan',
+                'error' => config('app.debug') ? $e->getMessage() : 'Internal server error'
+            ], 500);
+        }
     }
 
     /**
@@ -341,7 +428,7 @@ class AdminController extends Controller
     public function permissions(): JsonResponse
     {
         return response()->json([
-            'data' => Permission::orderBy('name')->pluck('name'),
+            'data' => Permission::orderBy('name')->get(['id', 'name']),
         ]);
     }
 

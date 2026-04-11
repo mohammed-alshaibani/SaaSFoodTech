@@ -34,6 +34,9 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->registerPolicies();
 
+        // Register Observers
+        \App\Models\UserSubscription::observe(\App\Observers\UserSubscriptionObserver::class);
+
         // Polyfill MySQL-native spatial functions for SQLite (Testing/Local)
         if (\Illuminate\Support\Facades\DB::getDriverName() === 'sqlite') {
             $pdo = \Illuminate\Support\Facades\DB::connection()->getPdo();

@@ -33,9 +33,8 @@ class ServiceRequestCompleted implements ShouldBroadcast
     {
         return [
             new PrivateChannel('service-requests'),
-            new PrivateChannel('customer.' . $this->serviceRequest->customer_id),
-            new PrivateChannel('provider.' . $this->serviceRequest->provider_id),
-            new PrivateChannel('admin.reports'),
+            new PrivateChannel('user.' . $this->serviceRequest->customer_id),
+            new PrivateChannel('user.' . $this->serviceRequest->provider_id),
         ];
     }
 
@@ -56,7 +55,7 @@ class ServiceRequestCompleted implements ShouldBroadcast
             'id' => $this->serviceRequest->id,
             'title' => $this->serviceRequest->title,
             'status' => $this->serviceRequest->status,
-            'completed_at' => $this->serviceRequest->updated_at->toISOString(),
+            'completed_at' => $this->serviceRequest->updated_at?->toISOString(),
             'customer' => [
                 'id' => $this->serviceRequest->customer->id,
                 'name' => $this->serviceRequest->customer->name,
@@ -84,6 +83,6 @@ class ServiceRequestCompleted implements ShouldBroadcast
 
         // In a real implementation, you'd store the accepted_at timestamp
         // For now, we'll use a placeholder calculation
-        return $this->serviceRequest->created_at->diffInMinutes($this->serviceRequest->updated_at);
+        return $this->serviceRequest->created_at?->diffInMinutes($this->serviceRequest->updated_at);
     }
 }

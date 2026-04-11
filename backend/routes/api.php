@@ -92,20 +92,12 @@ Route::middleware('api-security')->group(function () {
             Route::delete('/{permission}', [PermissionController::class, 'destroy'])
                 ->middleware('check.permission:permission.delete');
 
-            // Permission categories
-            Route::get('/categories', [PermissionController::class, 'categories'])
-                ->middleware('check.permission:permission.view');
-            Route::post('/categories', [PermissionController::class, 'storeCategory'])
-                ->middleware('check.permission:permission.create');
-
         });
 
         // Role Management Routes
         Route::prefix('roles')->group(function () {
             // View roles (requires role.view)
             Route::get('/', [RoleController::class, 'index'])
-                ->middleware('check.permission:role.view');
-            Route::get('/hierarchy', [RoleController::class, 'hierarchy'])
                 ->middleware('check.permission:role.view');
             Route::get('/{role}', [RoleController::class, 'show'])
                 ->middleware('check.permission:role.view');
@@ -127,12 +119,6 @@ Route::middleware('api-security')->group(function () {
                 ->middleware('check.permission:role.update');
             Route::post('/{role}/permissions/revoke', [RoleController::class, 'revokePermission'])
                 ->middleware('check.permission:role.update');
-
-            // Role hierarchy management
-            Route::post('/{role}/hierarchy/add', [RoleController::class, 'addChildRole'])
-                ->middleware('check.permission:role.hierarchy.manage');
-            Route::delete('/{role}/hierarchy/remove', [RoleController::class, 'removeChildRole'])
-                ->middleware('check.permission:role.hierarchy.manage');
 
         });
 
@@ -158,13 +144,16 @@ Route::middleware('api-security')->group(function () {
 
             // User management
             Route::get('/users', [AdminController::class, 'users']);
+            Route::post('/users', [AdminController::class, 'createUser']);
             Route::get('/users/{user}', [AdminController::class, 'showUser']);
             Route::put('/users/{user}', [AdminController::class, 'updateUser']);
             Route::delete('/users/{user}', [AdminController::class, 'deleteUser']);
             Route::patch('/users/{user}/plan', [AdminController::class, 'updatePlan']);
 
             // Dynamic permission assignment
-            Route::post('/users/{user}/permissions', [AdminController::class, 'syncPermissions']);
+            Route::post('/users/{user}/permissions', [AdminController::class, 'grantDirectPermission']);
+            Route::delete('/users/{user}/permissions/{permission}', [AdminController::class, 'revokeDirectPermission']);
+            Route::post('/users/{user}/permissions/sync', [AdminController::class, 'syncPermissions']);
             Route::delete('/users/{user}/permissions', [AdminController::class, 'revokeAllPermissions']);
 
             // Subscription approvals
@@ -177,8 +166,20 @@ Route::middleware('api-security')->group(function () {
             Route::patch('/plans/{plan}', [AdminController::class, 'updatePlanDetails']);
             Route::delete('/plans/{plan}', [AdminController::class, 'deletePlan']);
 
+            // Roles management
+            Route::get('/roles', [RoleController::class, 'index']);
+            Route::post('/roles', [RoleController::class, 'store']);
+            Route::put('/roles/{id}', [RoleController::class, 'update']);
+            Route::delete('/roles/{id}', [RoleController::class, 'destroy']);
+
             // Available permissions list (for frontend dropdown)
             Route::get('/permissions', [AdminController::class, 'permissions']);
+            Route::post('/permissions', [PermissionController::class, 'store'])
+                ->middleware('check.permission:permission.create');
+            Route::put('/permissions/{id}', [PermissionController::class, 'update'])
+                ->middleware('check.permission:permission.update');
+            Route::delete('/permissions/{id}', [PermissionController::class, 'destroy'])
+                ->middleware('check.permission:permission.delete');
             Route::get('/stats', [AdminController::class, 'stats']);
         });
 

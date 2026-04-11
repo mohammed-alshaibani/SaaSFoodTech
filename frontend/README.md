@@ -134,10 +134,34 @@ NEXT_PUBLIC_APP_NAME=SaaSFoodTech
 4. AuthorizationContext handles role-based routing
 5. Automatic session refresh and logout handling
 
-### **Role-Based Access**
-- **Customer**: Create requests, view own requests, manage subscription
-- **Provider**: View nearby requests, accept/complete requests
-- **Admin**: Full system access, user management, permissions
+### **Role-Based Access Control (RBAC)**
+The frontend uses a custom `AuthorizationContext` to manage permissions and roles provided by the backend.
+
+- **Customer**: 
+  - Views own service requests.
+  - Creates new requests (limited by subscription quota).
+  - Can upgrade plan to "Paid" for unlimited requests.
+- **Provider**: 
+  - Access to a global feed of "Pending" requests.
+  - Filtering by location/radius.
+  - Ability to "Accept" and "Complete" requests.
+- **Admin**: 
+  - System-wide statistics.
+  - User management (view/edit plans).
+  - Permission management (dynamic assignment).
+
+### **Key Design Decisions & Trade-offs**
+- **Simplicity over Map UI**: Decided to use a clean list/card view with radius filtering rather than a full map implementation (Google Maps/Leaflet) to keep the MVP focused on the core request lifecycle.
+- **Context API for State**: Chose React Context over Redux or Zustand for its native integration and sufficient capabilities for an MVP of this scale.
+- **Synchronous AI Feedback**: Opted for direct AI enhancement calls from the UI with loading states rather than an async polling mechanism to simplify the user experience.
+- **Client-Side Permission Enforcement**: Permissions are validated on the client for UI visibility/hiding, but are strictly enforced at every API call on the backend.
+
+### **What Would Be Improved With More Time**
+- **Dynamic Map Integration**: A real-time map to visualize nearby requests.
+- **Enhanced Form Validation**: More robust client-side validation using libraries like Formik or React Hook Form with Zod.
+- **Notification Center**: A dedicated UI for tracking historical notifications and alerts.
+- **Offline Support**: PWA capabilities for providers working in areas with poor connectivity.
+- **Unit/E2E Test Coverage**: Expanding the suite with Cypress for critical user paths (e.g., complete registration to request fulfillment).
 
 ## **Key Features Implementation**
 
