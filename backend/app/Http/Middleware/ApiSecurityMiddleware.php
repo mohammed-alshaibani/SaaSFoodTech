@@ -29,24 +29,47 @@ class ApiSecurityMiddleware
         if (in_array($request->method(), ['POST', 'PUT', 'PATCH'])) {
             $contentType = $request->header('Content-Type', '');
             if (!str_contains($contentType, 'application/json')) {
-                return response()->json([
+                $response = response()->json([
                     'success' => false,
-                    'error' => 'Content-Type must be application/json.',
+                    'error' => [
+                        'code' => 'INVALID_CONTENT_TYPE',
+                        'message' => 'Content-Type must be application/json.',
+                    ],
                     'request_id' => $requestId,
                 ], 415);
+                return $this->addSecurityHeaders($response, $requestId);
             }
         }
 
-        $response = $next($request);
+        // 4. Validate API Version
+        if ($request->hasHeader('X-API-Version') && $request->header('X-API-Version') !== '1.0') {
+            $response = response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'UNSUPPORTED_API_VERSION',
+                    'message' => 'The requested API version is not supported.',
+                ],
+                'request_id' => $requestId,
+            ], 400);
+            return $this->addSecurityHeaders($response, $requestId);
+        }
 
-        // 4. Standard Security Headers
+        $response = $next($request);
+        return $this->addSecurityHeaders($response, $requestId);
+    }
+
+    /**
+     * Helper to add consistent security headers.
+     */
+    private function addSecurityHeaders($response, string $requestId): Response
+    {
         $response->headers->set('X-Request-ID', $requestId);
         $response->headers->set('X-Frame-Options', 'DENY');
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('X-XSS-Protection', '1; mode=block');
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
-        $response->headers->set('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self';");
-        
+        $response->headers->set('Content-Security-Policy', "default-src 'self';");
+
         return $response;
     }
 }

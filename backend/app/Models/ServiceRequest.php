@@ -46,6 +46,11 @@ class ServiceRequest extends Model
         return $this->belongsTo(User::class, 'provider_id');
     }
 
+    public function attachments()
+    {
+        return $this->hasMany(Attachment::class);
+    }
+
     // ── Query Scopes ─────────────────────────────────────────
 
     /**
