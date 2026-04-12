@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 use Illuminate\Cache\RateLimiter;
@@ -20,7 +21,7 @@ class MiddlewareTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Seed roles and permissions
         $this->seed(\Database\Seeders\RolePermissionSeeder::class);
     }
@@ -32,7 +33,7 @@ class MiddlewareTest extends TestCase
     {
         $middleware = new ApiSecurityMiddleware();
         $request = Request::create('/api/test', 'POST');
-        
+
         $next = function ($req) {
             return new JsonResponse(['test' => 'data']);
         };
@@ -53,7 +54,7 @@ class MiddlewareTest extends TestCase
         $request = Request::create('/api/test', 'POST', [], [], [], [
             'CONTENT_TYPE' => 'text/plain'
         ]);
-        
+
         $next = function ($req) {
             return new JsonResponse(['test' => 'data']);
         };
@@ -78,7 +79,7 @@ class MiddlewareTest extends TestCase
         $request = Request::create('/api/test', 'GET', [], [], [], [
             'HTTP_X_API_VERSION' => '2.0'
         ]);
-        
+
         $next = function ($req) {
             return new JsonResponse(['test' => 'data']);
         };
@@ -100,7 +101,7 @@ class MiddlewareTest extends TestCase
     public function test_rate_limiting_free_plan(): void
     {
         $user = User::factory()->create(['plan' => 'free']);
-        
+
         $rateLimiter = Mockery::mock(RateLimiter::class);
         $rateLimiter->shouldReceive('tooManyAttempts')->andReturn(false);
         $rateLimiter->shouldReceive('retriesLeft')->andReturn(95);
@@ -111,7 +112,7 @@ class MiddlewareTest extends TestCase
         $request->setUserResolver(function () use ($user) {
             return $user;
         });
-        
+
         $next = function ($req) {
             return new JsonResponse(['test' => 'data']);
         };
@@ -128,7 +129,7 @@ class MiddlewareTest extends TestCase
     public function test_rate_limiting_paid_plan(): void
     {
         $user = User::factory()->create(['plan' => 'paid']);
-        
+
         $rateLimiter = Mockery::mock(RateLimiter::class);
         $rateLimiter->shouldReceive('tooManyAttempts')->andReturn(false);
         $rateLimiter->shouldReceive('retriesLeft')->andReturn(950);
@@ -139,7 +140,7 @@ class MiddlewareTest extends TestCase
         $request->setUserResolver(function () use ($user) {
             return $user;
         });
-        
+
         $next = function ($req) {
             return new JsonResponse(['test' => 'data']);
         };
@@ -156,7 +157,7 @@ class MiddlewareTest extends TestCase
     public function test_rate_limiting_exceeded(): void
     {
         $user = User::factory()->create(['plan' => 'free']);
-        
+
         $rateLimiter = Mockery::mock(RateLimiter::class);
         $rateLimiter->shouldReceive('tooManyAttempts')->andReturn(true);
         $rateLimiter->shouldReceive('availableIn')->andReturn(120);
@@ -166,7 +167,7 @@ class MiddlewareTest extends TestCase
         $request->setUserResolver(function () use ($user) {
             return $user;
         });
-        
+
         $next = function ($req) {
             return new JsonResponse(['test' => 'data']);
         };
@@ -197,7 +198,7 @@ class MiddlewareTest extends TestCase
 
         $middleware = new RateLimitByPlan($rateLimiter);
         $request = Request::create('/api/test', 'GET');
-        
+
         $next = function ($req) {
             return new JsonResponse(['test' => 'data']);
         };
@@ -214,7 +215,7 @@ class MiddlewareTest extends TestCase
     public function test_rate_limiting_ai_endpoint(): void
     {
         $user = User::factory()->create(['plan' => 'free']);
-        
+
         $rateLimiter = Mockery::mock(RateLimiter::class);
         $rateLimiter->shouldReceive('tooManyAttempts')->andReturn(false);
         $rateLimiter->shouldReceive('retriesLeft')->andReturn(4);
@@ -225,7 +226,7 @@ class MiddlewareTest extends TestCase
         $request->setUserResolver(function () use ($user) {
             return $user;
         });
-        
+
         $next = function ($req) {
             return new JsonResponse(['test' => 'data']);
         };

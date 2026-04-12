@@ -15,4 +15,12 @@ class Permission extends SpatiePermission
         'name',
         'guard_name',
     ];
+
+    /**
+     * Get the scopes for the permission.
+     */
+    public function scopes()
+    {
+        return $this->hasMany(PermissionScope::class);
+    }
 }
