@@ -53,6 +53,15 @@ class ServiceRequestController extends Controller
             $query->where('category', $request->category);
         }
 
+        // Proximity Filtering (Optional)
+        if ($request->has(['latitude', 'longitude'])) {
+            $query->nearby(
+                (float) $request->latitude,
+                (float) $request->longitude,
+                (float) ($request->radius ?? 50)
+            );
+        }
+
         return ServiceRequestResource::collection(
             $query->latest()->paginate(20)
         );
