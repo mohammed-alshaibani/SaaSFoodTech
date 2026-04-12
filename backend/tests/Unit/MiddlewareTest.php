@@ -59,7 +59,7 @@ class MiddlewareTest extends TestCase
             return new JsonResponse(['test' => 'data']);
         };
 
-        $response = $middleware->handle($request, $next);
+        $response = TestResponse::fromBaseResponse($middleware->handle($request, $next));
 
         $response->assertStatus(415)
             ->assertJson([
@@ -84,7 +84,7 @@ class MiddlewareTest extends TestCase
             return new JsonResponse(['test' => 'data']);
         };
 
-        $response = $middleware->handle($request, $next);
+        $response = TestResponse::fromBaseResponse($middleware->handle($request, $next));
 
         $response->assertStatus(400)
             ->assertJson([
@@ -117,7 +117,7 @@ class MiddlewareTest extends TestCase
             return new JsonResponse(['test' => 'data']);
         };
 
-        $response = $middleware->handle($request, $next);
+        $response = TestResponse::fromBaseResponse($middleware->handle($request, $next));
 
         $response->assertStatus(200);
         $this->assertEquals('100', $response->headers->get('X-RateLimit-Limit'));
@@ -145,7 +145,7 @@ class MiddlewareTest extends TestCase
             return new JsonResponse(['test' => 'data']);
         };
 
-        $response = $middleware->handle($request, $next);
+        $response = TestResponse::fromBaseResponse($middleware->handle($request, $next));
 
         $response->assertStatus(200);
         $this->assertEquals('1000', $response->headers->get('X-RateLimit-Limit'));
@@ -172,7 +172,7 @@ class MiddlewareTest extends TestCase
             return new JsonResponse(['test' => 'data']);
         };
 
-        $response = $middleware->handle($request, $next);
+        $response = TestResponse::fromBaseResponse($middleware->handle($request, $next));
 
         $response->assertStatus(429)
             ->assertJson([
@@ -203,7 +203,7 @@ class MiddlewareTest extends TestCase
             return new JsonResponse(['test' => 'data']);
         };
 
-        $response = $middleware->handle($request, $next);
+        $response = TestResponse::fromBaseResponse($middleware->handle($request, $next));
 
         $response->assertStatus(200);
         $this->assertEquals('60', $response->headers->get('X-RateLimit-Limit'));
@@ -231,7 +231,7 @@ class MiddlewareTest extends TestCase
             return new JsonResponse(['test' => 'data']);
         };
 
-        $response = $middleware->handle($request, $next);
+        $response = TestResponse::fromBaseResponse($middleware->handle($request, $next));
 
         $response->assertStatus(200);
         $this->assertEquals('5', $response->headers->get('X-RateLimit-Limit'));

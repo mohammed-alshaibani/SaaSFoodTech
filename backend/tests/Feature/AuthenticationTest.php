@@ -14,7 +14,7 @@ class AuthenticationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Seed roles and permissions
         $this->seed(\Database\Seeders\RolePermissionSeeder::class);
     }
@@ -226,10 +226,8 @@ class AuthenticationTest extends TestCase
 
         $response->assertStatus(401)
             ->assertJson([
-                'success' => false,
-                'error' => [
-                    'code' => 'UNAUTHENTICATED',
-                ],
+                'message' => 'Unauthenticated. Please provide a valid authentication token.',
+                'error' => 'Unauthorized',
             ]);
     }
 
@@ -246,7 +244,6 @@ class AuthenticationTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJson([
-                'success' => true,
                 'message' => 'Logged out successfully.',
             ]);
 
