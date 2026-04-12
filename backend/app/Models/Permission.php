@@ -23,4 +23,12 @@ class Permission extends SpatiePermission
     {
         return $this->hasMany(PermissionScope::class);
     }
+
+    /**
+     * Check if the permission has any scopes defined.
+     */
+    public function isScoped(): bool
+    {
+        return $this->scopes()->exists();
+    }
 }
