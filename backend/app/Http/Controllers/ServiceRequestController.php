@@ -70,20 +70,7 @@ class ServiceRequestController extends Controller
             attachments: $request->file('attachments', [])
         );
 
-        try {
-            $serviceRequest = $mainService->createServiceRequest($dto, $request->user()->id);
-        } catch (\Illuminate\Database\QueryException $e) {
-            // Handle legacy index collision during development
-            if (strpos($e->getMessage(), 'unique_pending_order') !== false || $e->errorInfo[1] == 1062) {
-                try {
-                    \Illuminate\Support\Facades\DB::statement('ALTER TABLE service_requests DROP INDEX unique_pending_order;');
-                } catch (\Exception $ex) {
-                }
-                $serviceRequest = $mainService->createServiceRequest($dto, $request->user()->id);
-            } else {
-                throw $e;
-            }
-        }
+        $serviceRequest = $mainService->createServiceRequest($dto, $request->user()->id);
 
         ServiceRequestCreated::dispatch($serviceRequest);
 
@@ -128,10 +115,20 @@ class ServiceRequestController extends Controller
             return response()->json(['message' => 'You cannot accept your own request.'], 403);
         }
 
-        if ($serviceRequest->provider_id !== null && $serviceRequest->provider_id !== $user->id) {
-            return response()->json(['message' => 'This request has already been accepted.'], 409);
+        // Case 1: You already own this request
+        if ($serviceRequest->provider_id === $user->id) {
+            return response()->json([
+                'message' => 'You have already accepted this request.',
+                'data' => new ServiceRequestResource($serviceRequest->load(['customer', 'provider']))
+            ]);
         }
 
+        // Case 2: Someone else accepted it
+        if ($serviceRequest->provider_id !== null) {
+            return response()->json(['message' => 'This request has already been accepted by another provider.'], 409);
+        }
+
+        // Case 3: Status is not pending (but wasn't caught by provider check)
         if ($serviceRequest->status !== 'pending') {
             return response()->json(['message' => 'Only pending requests can be accepted.'], 422);
         }
@@ -141,7 +138,11 @@ class ServiceRequestController extends Controller
             ->where('status', 'pending')
             ->whereNull('provider_id')
             ->lockForUpdate()
-            ->firstOrFail();
+            ->first();
+
+        if (!$serviceRequest) {
+            return response()->json(['message' => 'Request is no longer available.'], 410);
+        }
 
         $serviceRequest = $mainService->acceptServiceRequest($serviceRequest, $request->user()->id);
         ServiceRequestAccepted::dispatch($serviceRequest, $request->user()->id);
@@ -226,11 +227,13 @@ class ServiceRequestController extends Controller
      */
     public function update(UpdateServiceRequestRequest $request, ServiceRequest $serviceRequest): JsonResponse
     {
-        if ($serviceRequest->customer_id != $request->user()->id) {
+        // Allow admin OR owner
+        if (!$request->user()->hasRole('admin') && $serviceRequest->customer_id != $request->user()->id) {
             abort(403, 'You do not own this request.');
         }
 
-        if ($serviceRequest->status !== 'pending') {
+        // Admins can update any status, customers only pending
+        if (!$request->user()->hasRole('admin') && $serviceRequest->status !== 'pending') {
             abort(403, 'Only pending requests can be updated.');
         }
 
@@ -241,7 +244,8 @@ class ServiceRequestController extends Controller
             'longitude',
             'category',
             'urgency',
-            'business_area'
+            'business_area',
+            'status' // Allow status update for admins
         ]));
 
         return response()->json([
@@ -255,20 +259,29 @@ class ServiceRequestController extends Controller
      */
     public function destroy(Request $request, ServiceRequest $serviceRequest): JsonResponse
     {
-        if ($serviceRequest->customer_id != $request->user()->id) {
-            abort(403, 'You do not own this request.');
+        try {
+            // Allow admin OR owner
+            if (!$request->user()->hasRole('admin') && $serviceRequest->customer_id != $request->user()->id) {
+                return response()->json(['message' => 'Unauthorized deletion attempt'], 403);
+            }
+
+            // Manually delete attachments first to avoid constraint issues if cascade fails
+            $serviceRequest->attachments()->delete();
+
+            // Perform the deletion
+            $serviceRequest->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Service request deleted successfully',
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error("Delete failed for request #{$serviceRequest->id}: " . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete request: ' . $e->getMessage()
+            ], 500);
         }
-
-        if ($serviceRequest->status !== 'pending') {
-            abort(403, 'Only pending requests can be deleted.');
-        }
-
-        $serviceRequest->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Service request deleted successfully',
-        ], 200);
     }
 
     /**

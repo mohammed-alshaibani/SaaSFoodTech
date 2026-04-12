@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useI18n } from '@/context/I18nContext';
+import { useRole } from '@/hooks/useRole';
 import LanguageToggle from '@/components/LanguageToggle';
 import {
     LayoutDashboard,
@@ -23,22 +24,17 @@ import {
 export default function Sidebar() {
     const pathname = usePathname();
     const { user, logout } = useAuth();
+    const { role, isAdmin, isProvider } = useRole();
     const { t } = useI18n();
     const [isOpen, setIsOpen] = useState(false);
 
-    const activeText = "text-[#7C3AED] font-bold bg-[#7C3AED]/5 border-r-4 border-[#7C3AED]";
-    const inactiveText = "text-gray-600 hover:text-[#7C3AED] hover:bg-gray-50 border-r-4 border-transparent";
+    const activeText = "text-primary font-bold bg-primary/5 border-r-4 border-primary";
+    const inactiveText = "text-gray-600 hover:text-primary hover:bg-gray-50 border-r-4 border-transparent";
 
     // Role-based navigation items
     const getNavItems = () => {
-        let role = 'customer';
-        if (user?.roles?.[0]?.name) role = user.roles[0].name;
-        else if (typeof user?.roles?.[0] === 'string') role = user.roles[0];
-        else if (user?.parsed_role) role = user.parsed_role;
-        else if (user?.role) role = user.role;
-
         // Admin navigation
-        if (role === 'admin') {
+        if (isAdmin) {
             return [
                 { href: '/dashboard/admin', icon: LayoutDashboard, label: t('sidebar.dashboard') || 'لوحة التحكم', exact: true },
                 { href: '/dashboard/admin/users', icon: Users, label: t('sidebar.users') || 'المستخدمين', exact: false },
@@ -50,7 +46,7 @@ export default function Sidebar() {
         }
 
         // Provider navigation
-        if (role === 'provider' || role === 'provider_admin' || role === 'provider_employee') {
+        if (isProvider) {
             return [
                 { href: '/dashboard/provider', icon: LayoutDashboard, label: t('sidebar.dashboard') || 'لوحة التحكم', exact: true },
                 { href: '/dashboard/provider/subscriptions', icon: ShoppingBag, label: t('sidebar.mySubscriptions') || 'اشتراكاتي', exact: true },
@@ -73,16 +69,17 @@ export default function Sidebar() {
             {/* Mobile Hamburger */}
             <button
                 onClick={() => setIsOpen(true)}
-                className="lg:hidden fixed top-6 z-40 p-3 bg-white text-[#1E293B] rounded-xl shadow-md right-6 border border-gray-100"
+                className="lg:hidden fixed top-6 z-40 p-3 bg-white text-navy rounded-xl shadow-md right-6 border border-gray-100"
                 id="hamburger-menu"
+                aria-label="Open navigation menu"
             >
-                <Menu size={24} />
+                <Menu size={24} aria-hidden="true" />
             </button>
 
             {/* Backdrop */}
             {isOpen && (
                 <div
-                    className="fixed inset-0 bg-[#1E293B]/20 backdrop-blur-sm z-50 lg:hidden"
+                    className="fixed inset-0 bg-navy/20 backdrop-blur-sm z-50 lg:hidden"
                     onClick={() => setIsOpen(false)}
                 />
             )}
@@ -96,10 +93,10 @@ export default function Sidebar() {
                 <div className="flex flex-col h-full overflow-y-auto custom-scrollbar">
                     {/* Header */}
                     <div className="flex items-center gap-3 p-6 mb-2">
-                        <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-sm" style={{ backgroundColor: '#1E293B' }}>
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-sm bg-navy">
                             <Crown size={18} fill="currentColor" />
                         </div>
-                        <span className="text-xl font-black tracking-tight text-[#1E293B]">FoodTechSaas</span>
+                        <span className="text-xl font-black tracking-tight text-navy">FoodTechSaas</span>
                         <button onClick={() => setIsOpen(false)} className="lg:hidden ms-auto text-gray-400">
                             <X size={24} />
                         </button>
@@ -115,7 +112,7 @@ export default function Sidebar() {
                                 return (
                                     <Link key={item.href} href={item.href} onClick={() => setIsOpen(false)}
                                         className={`flex items-center gap-3 px-6 py-3 text-sm transition-all ${isActive ? activeText : inactiveText}`}>
-                                        <Icon size={20} className={isActive ? "text-[#7C3AED]" : "text-gray-400"} />
+                                        <Icon size={20} className={isActive ? "text-primary" : "text-gray-400"} />
                                         <span>{item.label}</span>
                                     </Link>
                                 );
@@ -131,7 +128,7 @@ export default function Sidebar() {
                                 onClick={logout}
                                 className="w-full flex items-center gap-3 p-3 rounded-xl bg-white border border-gray-200 hover:border-red-200 hover:bg-red-50/50 transition-all group"
                             >
-                                <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-[#1E293B] font-bold text-sm group-hover:bg-white group-hover:text-red-500 transition-colors">
+                                <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-navy font-bold text-sm group-hover:bg-white group-hover:text-red-500 transition-colors">
                                     {user?.name?.[0]?.toUpperCase() || 'A'}
                                 </div>
                                 <span className="flex-1 text-sm font-bold text-gray-600 group-hover:text-red-500 text-right transition-colors">

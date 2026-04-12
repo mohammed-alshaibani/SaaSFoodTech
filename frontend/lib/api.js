@@ -87,12 +87,16 @@ api.interceptors.response.use(
         }
 
         if (error.response?.status === 401) {
-            // Token expired or revoked — clear cache, clear server cookie, go to login
+            // Token expired or revoked — clear cache, clear server cookie
             cachedToken = null;
             await fetch('/api/session', { method: 'DELETE' });
 
             if (typeof window !== 'undefined') {
-                window.location.href = '/login';
+                const pathname = window.location.pathname;
+                // Only force redirect to login if we are in the dashboard
+                if (pathname.startsWith('/dashboard')) {
+                    window.location.href = '/login';
+                }
             }
         }
 

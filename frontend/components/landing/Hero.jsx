@@ -3,21 +3,13 @@
 import Link from 'next/link';
 import { useI18n } from '@/context/I18nContext';
 import { useAuth } from '@/context/AuthContext';
+import { useRole } from '@/hooks/useRole';
 import { ArrowRight, LayoutDashboard } from 'lucide-react';
 
 export default function Hero() {
     const { t } = useI18n();
     const { user, loading } = useAuth();
-
-    // Helper to get dashboard path from role
-    const getDashboardPath = () => {
-        if (!user) return '/register';
-        const role = user.roles?.[0] || '';
-        if (role === 'admin') return '/dashboard/admin';
-        if (role === 'customer') return '/dashboard/customer';
-        if (role === 'provider_admin' || role === 'provider_employee') return '/dashboard/provider';
-        return '/dashboard/customer';
-    };
+    const { dashboardPath } = useRole();
 
     return (
         <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden bg-slate-50">
@@ -50,7 +42,7 @@ export default function Hero() {
                         <div className="flex flex-wrap justify-center gap-4 pt-4">
                             {!loading && user ? (
                                 <Link
-                                    href={getDashboardPath()}
+                                    href={dashboardPath}
                                     className="px-8 py-4 rounded-full bg-blue-600 text-white text-base font-bold hover:bg-blue-700 transition-all active:scale-[0.98] shadow-2xl shadow-blue-600/20 flex items-center gap-2"
                                 >
                                     <LayoutDashboard className="w-5 h-5" />

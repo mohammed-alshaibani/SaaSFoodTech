@@ -22,6 +22,19 @@ class UpdateServiceRequestRequest extends FormRequest
      */
     public function rules(): array
     {
+        // Standard PUT update (for title, description, and Admin status override)
+        if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
+            if (!$this->routeIs('*/accept') && !$this->routeIs('*/complete')) {
+                return [
+                    'title' => 'sometimes|string|max:255',
+                    'description' => 'sometimes|string',
+                    'status' => 'sometimes|string|in:pending,accepted,work_done,completed,cancelled',
+                    'category' => 'sometimes|string',
+                    'urgency' => 'sometimes|string|in:low,medium,high,critical',
+                ];
+            }
+        }
+
         $rules = [];
 
         // For accept action

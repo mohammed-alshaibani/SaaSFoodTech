@@ -77,7 +77,13 @@ export function AuthenticationProvider({ children }) {
             }
 
             const { access_token, user: userData } = data;
-            const role = userData.roles && userData.roles.length > 0 ? userData.roles[0] : 'customer';
+
+            // Normalize role - handle both string and object formats
+            let role = 'customer';
+            if (userData.roles && userData.roles.length > 0) {
+                const firstRole = userData.roles[0];
+                role = typeof firstRole === 'string' ? firstRole : firstRole.name;
+            }
 
             await fetch('/api/session', {
                 method: 'POST',
@@ -118,7 +124,13 @@ export function AuthenticationProvider({ children }) {
             }
 
             const { access_token, user: userData } = data;
-            const role = userData.roles && userData.roles.length > 0 ? userData.roles[0] : 'customer';
+
+            // Normalize role - handle both string and object formats
+            let role = 'customer';
+            if (userData.roles && userData.roles.length > 0) {
+                const firstRole = userData.roles[0];
+                role = typeof firstRole === 'string' ? firstRole : firstRole.name;
+            }
 
             await fetch('/api/session', {
                 method: 'POST',

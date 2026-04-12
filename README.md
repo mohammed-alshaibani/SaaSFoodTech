@@ -90,6 +90,12 @@ Included an AI enhancement feature to improve service quality:
 - **Mock Payment**: Implemented a mock credit card simulation for plan upgrades to demonstrate the workflow without requiring actual Stripe/PayPal credentials.
 - **AI Enhancement**: Integrated Google Gemini API to automatically improve service request descriptions, adding professional value to customer postings.
 
+## Default Credentials
+
+Admin: admin@example.com / password
+Provider: provider@example.com / password
+Customer: john@example.com / password
+
 ## Setup Instructions
 
 ### Using Docker (Recommended)
@@ -127,3 +133,4 @@ Included an AI enhancement feature to improve service quality:
 - **Advanced Maps**: Integrating Google Maps/Leaflet for visual request clustering.
 - **Payment Gateway**: Moving from mock payment to Stripe/PayPal production integration.
 - **ElasticSearch**: Implementing full-text search and advanced AI-driven matching engines.
+

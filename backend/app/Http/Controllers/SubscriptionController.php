@@ -59,17 +59,12 @@ class SubscriptionController extends Controller
         // Check if mock payment
         $isMock = $request->input('payment_method') === 'mock_credit_card' || $request->input('payment_method') === 'card';
 
-        // Safely wipe the constraint to allow infinite subscription states
-        try {
-            \Illuminate\Support\Facades\DB::statement('ALTER TABLE user_subscriptions DROP INDEX user_subscriptions_user_id_status_unique');
-        } catch (\Exception $e) {
-        }
+        // requirement: user any time can change its plan. downgrades/upgrades fully allowed.
 
-        // If mock payment activates immediately, expire old active subscriptions
-        // Use raw DB update to bypass any Eloquent unique-constraint caching
+        // If mock payment activates immediately, archive old active subscriptions
+        // The unique constraint has been removed via migration, so we can have multiple archived entries
         if ($isMock) {
-            \Illuminate\Support\Facades\DB::table('user_subscriptions')
-                ->where('user_id', $user->id)
+            UserSubscription::where('user_id', $user->id)
                 ->where('status', 'active')
                 ->update([
                     'status' => 'archived',

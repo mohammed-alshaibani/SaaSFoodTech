@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { useI18n } from '@/context/I18nContext';
+import { useRole } from '@/hooks/useRole';
 import { Menu, X, Rocket } from 'lucide-react';
 import LanguageToggle from '@/components/auth/LanguageToggle';
 
@@ -11,21 +12,8 @@ export default function Navbar() {
     const [isOpen, setIsOpen] = useState(false);
     const [scrolled, setScrolled] = useState(false);
     const { user } = useAuth();
+    const { dashboardPath } = useRole();
     const { t, isRTL } = useI18n();
-
-    // Determine dashboard path based on user role
-    const getDashboardPath = () => {
-        if (!user || !user.roles || user.roles.length === 0) return '/dashboard';
-        const role = user.roles[0];
-        if (typeof role === 'string') {
-            if (role === 'admin') return '/dashboard/admin';
-            if (role === 'provider_admin' || role === 'provider_employee') return '/dashboard/provider';
-            return '/dashboard/customer';
-        }
-        if (role.name === 'admin') return '/dashboard/admin';
-        if (role.name === 'provider_admin' || role.name === 'provider_employee') return '/dashboard/provider';
-        return '/dashboard/customer';
-    };
 
     useEffect(() => {
         const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -73,7 +61,7 @@ export default function Navbar() {
                     {user ? (
                         <>
                             <Link
-                                href={getDashboardPath()}
+                                href={dashboardPath}
                                 className="px-5 py-2.5 rounded-full bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-all active:scale-[0.98] shadow-md shadow-blue-600/10"
                             >
                                 {t('common.dashboard') || 'Dashboard'}
@@ -101,8 +89,10 @@ export default function Navbar() {
                 <button
                     className="md:hidden p-2 text-gray-600 hover:text-blue-600 transition"
                     onClick={() => setIsOpen(!isOpen)}
+                    aria-label={isOpen ? "Close menu" : "Open menu"}
+                    aria-expanded={isOpen}
                 >
-                    {isOpen ? <X /> : <Menu />}
+                    {isOpen ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
                 </button>
             </div>
 

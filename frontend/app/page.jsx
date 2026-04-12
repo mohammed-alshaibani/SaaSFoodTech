@@ -1,10 +1,3 @@
-'use client';
-
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/context/AuthenticationContext';
-
-// Landing Page Components
 import Navbar from '@/components/landing/Navbar';
 import Hero from '@/components/landing/Hero';
 import TrustBar from '@/components/landing/TrustBar';
@@ -14,22 +7,21 @@ import Pricing from '@/components/landing/Pricing';
 import FAQ from '@/components/landing/FAQ';
 import Footer from '@/components/landing/Footer';
 
-export default function LandingPage() {
-    const { user, loading } = useAuth();
-    const router = useRouter();
-
-    // Public Access: Home page is open to all.
-    // Dashboard redirect is now handled manually via the Hero component.
-
-    if (loading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-white">
-                <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-            </div>
-        );
+export const metadata = {
+    title: 'ServiceHub | Standardized SaaS for FoodTech',
+    description: 'The ultimate platform for service providers and customers in the FoodTech industry. Manage requests, subscriptions, and scale your business.',
+    keywords: ['foodtech', 'saas', 'service provider', 'customer management', 'platform'],
+    openGraph: {
+        title: 'ServiceHub | FoodTech SaaS',
+        description: 'Connect with providers and customers seamlessly.',
+        type: 'website',
     }
+};
 
-    // If user is not logged in, show the Landing Page
+export default function LandingPage() {
+    // This is now a Server Component. It renders the skeleton of the landing page.
+    // Interactive parts like Navbar and Hero handle their own Client-side state.
+
     return (
         <main className="relative bg-slate-50 selection:bg-primary/20 selection:text-primary min-h-screen overflow-x-hidden">
 
