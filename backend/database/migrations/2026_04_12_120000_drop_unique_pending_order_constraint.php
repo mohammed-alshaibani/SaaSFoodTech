@@ -10,18 +10,16 @@ return new class extends Migration {
      */
     public function up(): void
     {
+        // Skip index drop logic for SQLite as the partial index may not exist or requires table recreation
+        if (config('database.default') === 'sqlite') {
+            return;
+        }
+
         Schema::table('service_requests', function (Blueprint $table) {
-            // Drop the constraint preventing users from having multiple pending requests
-            // We use DROP INDEX generically in case it was created as a distinct index.
-            // On sqlite dropUnique requires a column array, but dropping the explicitly named index handles overrides seamlessly.
             try {
                 $table->dropUnique('unique_pending_order');
             } catch (\Exception $e) {
-                try {
-                    $table->dropIndex('unique_pending_order');
-                } catch (\Exception $e2) {
-                    // ignore if already dropped
-                }
+                // Ignore if not exists
             }
         });
     }
