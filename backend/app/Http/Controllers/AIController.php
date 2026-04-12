@@ -19,10 +19,6 @@ class AIController extends Controller
         $this->model = config('services.gemini.model') ?: env('GEMINI_MODEL', 'gemini-1.5-flash');
     }
 
-    /**
-     * POST /api/ai/enhance
-     * Enhance service request description
-     */
     public function enhance(Request $request): JsonResponse
     {
         $request->validate([
@@ -57,10 +53,6 @@ class AIController extends Controller
         }
     }
 
-    /**
-     * POST /api/ai/categorize
-     * Categorize service request
-     */
     public function categorize(Request $request): JsonResponse
     {
         $request->validate([
@@ -80,7 +72,6 @@ class AIController extends Controller
             $prompt = $this->buildCategorizationPrompt($request->title, $request->description);
             $response = $this->callGeminiAPI($prompt);
 
-            // Extract category from response
             $category = $this->extractCategory($response);
 
             return response()->json([
@@ -100,10 +91,6 @@ class AIController extends Controller
         }
     }
 
-    /**
-     * POST /api/ai/suggest-pricing
-     * Suggest pricing for service request
-     */
     public function suggestPricing(Request $request): JsonResponse
     {
         $request->validate([
@@ -155,9 +142,6 @@ class AIController extends Controller
         }
     }
 
-    /**
-     * Call Gemini API
-     */
     private function callGeminiAPI(string $prompt): string
     {
         $response = Http::timeout(30)->post("https://generativelanguage.googleapis.com/v1beta/models/{$this->model}:generateContent?key={$this->apiKey}", [
@@ -189,106 +173,34 @@ class AIController extends Controller
         return $data['candidates'][0]['content']['parts'][0]['text'];
     }
 
-    /**
-     * Build enhancement prompt
-     */
     private function buildEnhancementPrompt(string $description, ?string $type): string
     {
         $context = $type === 'service_request'
             ? 'This is for a service request marketplace. Make it clear, professional, and appealing to service providers.'
             : 'Make this text more professional and clear.';
 
-        return "You are a professional content editor. Your task is to enhance the following description.
-
-{$context}
-
-Original description: {$description}
-
-Please provide:
-1. An enhanced version that is clearer, more professional, and more detailed
-2. Keep the core meaning intact
-3. Add relevant details that would be helpful
-4. Make it between 50-200 words
-5. Use professional but accessible language
-
-Enhanced description:";
+        return "You are a professional content editor. Your task is to enhance the following description.\n\n{$context}\n\nOriginal description: {$description}\n\nPlease provide:\n1. An enhanced version that is clearer, more professional, and more detailed\n2. Keep the core meaning intact\n3. Add relevant details that would be helpful\n4. Make it between 50-200 words\n5. Use professional but accessible language\n\nEnhanced description:";
     }
 
-    /**
-     * Build categorization prompt
-     */
     private function buildCategorizationPrompt(string $title, string $description): string
     {
-        $categories = implode(', ', [
-            'plumbing',
-            'electrical',
-            'hvac',
-            'cleaning',
-            'landscaping',
-            'pest_control',
-            'other'
-        ]);
+        $categories = implode(', ', ['plumbing', 'electrical', 'hvac', 'cleaning', 'landscaping', 'pest_control', 'other']);
 
-        return "You are a service categorization expert. Based on the title and description, categorize this service request.
-
-Available categories: {$categories}
-
-Title: {$title}
-Description: {$description}
-
-Please respond with ONLY the category name that best fits this request. Choose the most appropriate category from the list above.
-
-Category:";
+        return "You are a service categorization expert. Based on the title and description, categorize this service request. \n\nAvailable categories: {$categories}\n\nTitle: {$title}\nDescription: {$description}\n\nPlease respond with ONLY the category name that best fits this request. Choose the most appropriate category from the list above.\n\nCategory:";
     }
 
-    /**
-     * Build pricing prompt
-     */
     private function buildPricingPrompt(string $title, string $description, ?string $category, ?string $urgency, ?string $location): string
     {
         $urgencyText = $urgency ? "Urgency: {$urgency}" : "Urgency: normal";
         $categoryText = $category ? "Category: {$category}" : "Category: unspecified";
         $locationText = $location ? "Location: {$location}" : "Location: unspecified";
 
-        return "You are a pricing expert for service marketplace. Suggest a fair price for this service request.
-
-{$urgencyText}
-{$categoryText}
-{$locationText}
-
-Title: {$title}
-Description: {$description}
-
-Please provide:
-1. A specific suggested price in USD
-2. A reasonable price range (min-max)
-3. Key factors influencing the price
-4. Consider standard market rates
-
-Respond in JSON format:
-{
-    \"price\": 150,
-    \"range\": \"120-180\",
-    \"factors\": [\"complexity\", \"urgency\", \"location\"]
-}";
+        return "You are a pricing expert for service marketplace. Suggest a fair price for this service request.\n\n{$urgencyText}\n{$categoryText}\n{$locationText}\n\nTitle: {$title}\nDescription: {$description}\n\nPlease provide:\n1. A specific suggested price in USD\n2. A reasonable price range (min-max)\n3. Key factors influencing the price\n4. Consider standard market rates\n\nRespond in JSON format:\n{\n    \"price\": 150,\n    \"range\": \"120-180\",\n    \"factors\": [\"complexity\", \"urgency\", \"location\"]\n}";
     }
 
-    /**
-     * Extract category from AI response
-     */
     private function extractCategory(string $response): string
     {
-        $validCategories = [
-            'plumbing',
-            'electrical',
-            'hvac',
-            'cleaning',
-            'landscaping',
-            'pest_control',
-            'other'
-        ];
-
-        // Clean response and find matching category
+        $validCategories = ['plumbing', 'electrical', 'hvac', 'cleaning', 'landscaping', 'pest_control', 'other'];
         $response = strtolower(trim($response));
 
         foreach ($validCategories as $category) {
@@ -300,13 +212,9 @@ Respond in JSON format:
         return 'other';
     }
 
-    /**
-     * Extract pricing from AI response
-     */
     private function extractPricing(string $response): array
     {
         try {
-            // Try to parse JSON response
             if (preg_match('/\{.*\}/s', $response, $matches)) {
                 $data = json_decode($matches[0], true);
 
@@ -319,7 +227,6 @@ Respond in JSON format:
                 }
             }
 
-            // Fallback: extract price from text
             if (preg_match('/\$(\d+)/', $response, $matches)) {
                 return [
                     'price' => (int) $matches[1],
@@ -329,7 +236,6 @@ Respond in JSON format:
             }
 
             throw new \Exception('Could not extract pricing from response');
-
         } catch (\Exception $e) {
             return [
                 'price' => null,
@@ -339,12 +245,8 @@ Respond in JSON format:
         }
     }
 
-    /**
-     * Calculate confidence score
-     */
     private function calculateConfidence(string $category, string $response): float
     {
-        // Simple confidence calculation based on response clarity
         $response = strtolower($response);
         $category = strtolower($category);
 

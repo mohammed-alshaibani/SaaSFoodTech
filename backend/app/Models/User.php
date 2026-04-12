@@ -18,11 +18,6 @@ class User extends Authenticatable
 
     protected $guard_name = 'sanctum';
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'name',
         'email',
@@ -32,21 +27,11 @@ class User extends Authenticatable
         'longitude',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var array<int, string>
-     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
@@ -65,25 +50,16 @@ class User extends Authenticatable
         return $this->hasMany(ServiceRequest::class, 'provider_id');
     }
 
-    /**
-     * Get the user's subscriptions.
-     */
     public function subscriptions()
     {
         return $this->hasMany(UserSubscription::class);
     }
 
-    /**
-     * Get the user's active subscription.
-     */
     public function activeSubscription()
     {
         return $this->subscriptions()->active()->first();
     }
 
-    /**
-     * Get the user's subscription plan.
-     */
     public function subscriptionPlan()
     {
         return $this->hasOneThrough(
@@ -96,11 +72,6 @@ class User extends Authenticatable
         )->active();
     }
 
-    // Spatie HasRoles provides all permission logic intrinsically.
-
-    /**
-     * Get the user's current plan name using strategy pattern.
-     */
     public function getCurrentPlan(): string
     {
         $activeSubscription = $this->activeSubscription();
@@ -111,23 +82,16 @@ class User extends Authenticatable
         return $this->plan ?? 'free';
     }
 
-    /**
-     * Check if user is on a specific plan.
-     */
     public function isOnPlan(string $planName): bool
     {
         return $this->getCurrentPlan() === $planName;
     }
 
-    /**
-     * Check if user has exceeded their monthly request limit.
-     */
     public function hasExceededRequestLimit(): bool
     {
         $activeSubscription = $this->activeSubscription();
 
         if (!$activeSubscription) {
-            // Fallback to legacy plan logic
             return $this->plan !== 'free' ? false :
                 $this->serviceRequests()->whereMonth('created_at', now()->month)->count() >= 3;
         }
@@ -145,15 +109,11 @@ class User extends Authenticatable
         return $currentCount >= $limit;
     }
 
-    /**
-     * Get current month's request usage.
-     */
     public function getCurrentMonthUsage(): array
     {
         $activeSubscription = $this->activeSubscription();
 
         if (!$activeSubscription) {
-            // Fallback to legacy plan logic
             $limit = $this->plan === 'free' ? 3 : 'unlimited';
             $used = $this->serviceRequests()->whereIn('status', ['pending', 'accepted'])->count();
 
@@ -176,15 +136,11 @@ class User extends Authenticatable
         ];
     }
 
-    /**
-     * Check if user has access to a specific feature.
-     */
     public function hasFeatureAccess(string $feature): bool
     {
         $activeSubscription = $this->activeSubscription();
 
         if (!$activeSubscription) {
-            // Fallback to legacy plan logic
             return match ($feature) {
                 'ai_enhancement' => in_array($this->plan, ['premium', 'enterprise']),
                 'priority_support' => in_array($this->plan, ['premium', 'enterprise']),
@@ -196,12 +152,8 @@ class User extends Authenticatable
         return $activeSubscription->hasFeature($feature);
     }
 
-    /**
-     * Subscribe to a plan.
-     */
     public function subscribeTo(SubscriptionPlan $plan, array $options = []): UserSubscription
     {
-        // Cancel any existing active subscriptions
         $this->subscriptions()->active()->update([
             'status' => 'canceled',
             'canceled_at' => now(),
@@ -215,13 +167,5 @@ class User extends Authenticatable
             'trial_ends_at' => $options['trial_ends_at'] ?? null,
             'metadata' => $options['metadata'] ?? [],
         ]);
-    }
-
-    /**
-     * Get all effective permissions for the user (including roles and direct).
-     */
-    public function getAllEffectivePermissions()
-    {
-        return $this->getAllPermissions();
     }
 }

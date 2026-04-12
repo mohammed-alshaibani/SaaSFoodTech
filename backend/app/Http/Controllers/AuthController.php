@@ -14,9 +14,6 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
-    /**
-     * Register a new user
-     */
     public function register(RegisterRequest $request): JsonResponse
     {
         return \Illuminate\Support\Facades\DB::transaction(function () use ($request) {
@@ -27,25 +24,16 @@ class AuthController extends Controller
                 'plan' => 'free',
             ]);
 
-            // Role assignment logic
             $role = $request->role;
-
-            // Log the received role for debugging
-            \Log::info('Registration role assignment', [
-                'requested_role' => $role,
-                'user_id' => $user->id
-            ]);
 
             if ($role === 'provider')
                 $role = 'provider_admin';
 
-            // Ensure only valid roles are assigned
             $validRoles = ['admin', 'provider_admin', 'customer'];
             if (!in_array($role, $validRoles))
                 $role = 'customer';
 
             $user->assignRole($role);
-
             $token = $user->createToken('auth_token')->plainTextToken;
 
             return response()->json([
@@ -56,9 +44,6 @@ class AuthController extends Controller
         });
     }
 
-    /**
-     * Login user
-     */
     public function login(LoginRequest $request): JsonResponse
     {
         $user = User::where('email', $request->email)->first();
@@ -69,8 +54,6 @@ class AuthController extends Controller
             ]);
         }
 
-        // Revoke previous tokens on login to limit active session sprawl (optional)
-        // $user->tokens()->delete();
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
@@ -80,36 +63,17 @@ class AuthController extends Controller
         ]);
     }
 
-    /**
-     * POST /api/logout
-     */
     public function logout(Request $request): JsonResponse
     {
         $request->user()->currentAccessToken()->delete();
-
         return response()->json(['message' => 'Logged out successfully.']);
     }
 
-    /**
-     * GET /api/me
-     * Returns the authenticated user enriched with subscription gate data.
-     * Frontend uses `request_count` and `limit_reached` to render the upgrade banner
-     * and disable the "New Request" button.
-     */
     public function me(Request $request): JsonResponse
     {
         return response()->json($this->buildUserPayload($request->user()));
     }
 
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
-
-    /**
-     * Build the standardized user payload used in auth responses and /me.
-     *
-     * @return array<string, mixed>
-     */
     private function buildUserPayload(User $user): array
     {
         $user->load('roles');

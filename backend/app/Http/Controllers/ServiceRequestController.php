@@ -22,29 +22,20 @@ class ServiceRequestController extends Controller
 {
     use AuthorizesRequests;
 
-    /**
-     * GET /api/requests
-     * Role-scoped list of service requests
-     */
     public function index(Request $request): AnonymousResourceCollection
     {
         $user = $request->user();
         $query = ServiceRequest::with(['customer', 'provider']);
 
-        // Role-based filtering — direct checks bypass policy caching
         if ($user->hasRole('customer')) {
-            // Customers see only their own requests
             $query->where('customer_id', $user->id);
         } elseif ($user->hasRole(['provider_admin', 'provider_employee', 'provider'])) {
-            // Providers see ALL pending requests + their own assigned requests
             $query->where(function ($q) use ($user) {
                 $q->where('status', 'pending')
                     ->orWhere('provider_id', $user->id);
             });
         }
-        // Admins see everything (no filter applied)
 
-        // Apply filters
         if ($request->status) {
             $query->where('status', $request->status);
         }
@@ -53,7 +44,6 @@ class ServiceRequestController extends Controller
             $query->where('category', $request->category);
         }
 
-        // Proximity Filtering (Optional)
         if ($request->has(['latitude', 'longitude'])) {
             $query->nearby(
                 (float) $request->latitude,
@@ -67,15 +57,10 @@ class ServiceRequestController extends Controller
         );
     }
 
-    /**
-     * POST /api/requests
-     * Create a new service request
-     */
     public function store(StoreServiceRequestRequest $request, MainService $mainService): JsonResponse
     {
         $this->authorize('create', ServiceRequest::class);
 
-        // Data mapping to strongly-typed DTO
         $dto = new ServiceRequestDTO(
             title: $request->title,
             description: $request->description,
@@ -86,32 +71,26 @@ class ServiceRequestController extends Controller
         );
 
         try {
-            // Delegate to central MainService
             $serviceRequest = $mainService->createServiceRequest($dto, $request->user()->id);
         } catch (\Illuminate\Database\QueryException $e) {
+            // Handle legacy index collision during development
             if (strpos($e->getMessage(), 'unique_pending_order') !== false || $e->errorInfo[1] == 1062) {
-                // Drop the constraint dynamically if it still exists and retry
                 try {
                     \Illuminate\Support\Facades\DB::statement('ALTER TABLE service_requests DROP INDEX unique_pending_order;');
                 } catch (\Exception $ex) {
                 }
-
                 $serviceRequest = $mainService->createServiceRequest($dto, $request->user()->id);
             } else {
                 throw $e;
             }
         }
 
-        // Fire real-time broadcast event
         ServiceRequestCreated::dispatch($serviceRequest);
 
-        // AI Enhancement moved to frontend. 
-        // Geolocation Check
         $hasProviders = \App\Models\User::role(['provider_admin', 'provider_employee'])
             ->whereNotNull('latitude')
-            ->count() > 0; // Simplified check for MVP footprint
+            ->count() > 0;
 
-        // Prepare response
         $response = new ServiceRequestResource($serviceRequest);
         $result = $response->response()->setStatusCode(201);
 
@@ -125,26 +104,22 @@ class ServiceRequestController extends Controller
     }
 
     /**
-     * GET /api/requests/{serviceRequest}
      * Show a single service request
      */
     public function show(ServiceRequest $serviceRequest): ServiceRequestResource
     {
         $this->authorize('view', $serviceRequest);
-
         $serviceRequest->load(['customer', 'provider']);
         return new ServiceRequestResource($serviceRequest);
     }
 
     /**
-     * PATCH /api/requests/{serviceRequest}/accept
      * Provider accepts a pending request
      */
     public function accept(Request $request, ServiceRequest $serviceRequest, MainService $mainService): JsonResponse
     {
         $user = $request->user();
 
-        // Direct role check — bypass policy gate caching
         if (!$user->hasRole(['provider_admin', 'provider_employee', 'provider', 'admin'])) {
             return response()->json(['message' => 'Only providers can accept requests.'], 403);
         }
@@ -168,10 +143,7 @@ class ServiceRequestController extends Controller
             ->lockForUpdate()
             ->firstOrFail();
 
-        // Delegate to MainService
         $serviceRequest = $mainService->acceptServiceRequest($serviceRequest, $request->user()->id);
-
-        // Fire real-time broadcast event
         ServiceRequestAccepted::dispatch($serviceRequest, $request->user()->id);
 
         return response()->json([
@@ -181,19 +153,16 @@ class ServiceRequestController extends Controller
     }
 
     /**
-     * PATCH /api/requests/{serviceRequest}/work-done
      * Provider marks an accepted request as work done
      */
     public function workDone(Request $request, ServiceRequest $serviceRequest, MainService $mainService): JsonResponse
     {
-        // Require policy check (can reuse complete or a new one)
-        // $this->authorize('update', $serviceRequest); 
         if ($serviceRequest->provider_id !== $request->user()->id || $serviceRequest->status !== 'accepted') {
             abort(403, 'Unauthorized sequence');
         }
 
         $serviceRequest = $mainService->workDoneServiceRequest($serviceRequest);
-        ServiceRequestCompleted::dispatch($serviceRequest); // Fire event
+        ServiceRequestCompleted::dispatch($serviceRequest);
 
         return response()->json([
             'message' => 'Service request work marked as done',
@@ -202,7 +171,6 @@ class ServiceRequestController extends Controller
     }
 
     /**
-     * PATCH /api/requests/{serviceRequest}/complete
      * Customer marks a request as completed (approved)
      */
     public function complete(Request $request, ServiceRequest $serviceRequest, MainService $mainService): JsonResponse
@@ -211,7 +179,6 @@ class ServiceRequestController extends Controller
             abort(403, 'Unauthorized sequence');
         }
 
-        // Delegate to MainService
         $serviceRequest = $mainService->completeServiceRequest($serviceRequest);
 
         return response()->json([
@@ -221,7 +188,6 @@ class ServiceRequestController extends Controller
     }
 
     /**
-     * PATCH /api/requests/{serviceRequest}/cancel
      * Customer cancels a request
      */
     public function cancel(Request $request, ServiceRequest $serviceRequest, MainService $mainService): JsonResponse
@@ -239,7 +205,6 @@ class ServiceRequestController extends Controller
     }
 
     /**
-     * PATCH /api/requests/{serviceRequest}/drop
      * Provider drops a request
      */
     public function drop(Request $request, ServiceRequest $serviceRequest, MainService $mainService): JsonResponse
@@ -257,7 +222,6 @@ class ServiceRequestController extends Controller
     }
 
     /**
-     * PUT/PATCH /api/requests/{serviceRequest}
      * Update an existing service request
      */
     public function update(UpdateServiceRequestRequest $request, ServiceRequest $serviceRequest): JsonResponse
@@ -287,7 +251,6 @@ class ServiceRequestController extends Controller
     }
 
     /**
-     * DELETE /api/requests/{serviceRequest}
      * Delete a service request
      */
     public function destroy(Request $request, ServiceRequest $serviceRequest): JsonResponse
@@ -309,7 +272,6 @@ class ServiceRequestController extends Controller
     }
 
     /**
-     * GET /api/requests/nearby
      * Get nearby pending service requests
      */
     public function nearby(Request $request): AnonymousResourceCollection
@@ -328,21 +290,16 @@ class ServiceRequestController extends Controller
         $lng = (float) $request->longitude;
         $radius = (float) ($request->radius ?? 50);
 
-        // Get nearby requests using spatial query
-        $query = ServiceRequest::with(['customer'])
-            ->nearby($lat, $lng, $radius);
+        $query = ServiceRequest::with(['customer'])->nearby($lat, $lng, $radius);
 
-        // Filter by status (default to pending)
         if ($request->has('status')) {
             $query->where('status', $request->status);
         } else {
             $query->where('status', 'pending');
         }
 
-        // Exclude user's own requests
         $query->where('customer_id', '!=', $user->id);
 
-        // Exclude requests already accepted by this user
         $query->where(function ($q) use ($user) {
             $q->whereNull('provider_id')
                 ->orWhere('provider_id', '!=', $user->id);
@@ -359,14 +316,12 @@ class ServiceRequestController extends Controller
     private function enhanceWithAI(ServiceRequest $serviceRequest): void
     {
         try {
-            // Check if API key is configured
             $apiKey = config('services.gemini.api_key');
 
             if (!$apiKey || $apiKey === 'your_gemini_api_key_here') {
                 throw new \Exception('Gemini API key not configured.');
             }
 
-            // Simple AI enhancement (direct API call)
             $client = new \GuzzleHttp\Client(['timeout' => 10]);
             $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' . $apiKey, [
                 'json' => [
@@ -387,16 +342,14 @@ class ServiceRequestController extends Controller
                 $serviceRequest->update([
                     'description' => trim($data['candidates'][0]['content']['parts'][0]['text'])
                 ]);
-                return; // Success
+                return;
             }
         } catch (\Exception $e) {
             \Log::warning('External AI enhancement failed, using local fallback: ' . $e->getMessage());
         }
 
-        // --- Local Fallback Logic ---
-        // If external AI is unavailable, we apply a static "professionalizer"
+        // Local Fallback: apply a static professionalizer
         $original = $serviceRequest->description;
-
         $replacements = [
             'fix' => 'repair and restore',
             'broken' => 'malfunctioning',
