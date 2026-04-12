@@ -24,12 +24,14 @@ return new class extends Migration {
             $table->index(['latitude', 'longitude']);
         });
 
-        // Add check constraints for coordinate validation
-        DB::statement('
-            ALTER TABLE service_requests 
-            ADD CONSTRAINT valid_coordinates 
-            CHECK (latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180)
-        ');
+        // Add check constraints for coordinate validation (MySQL specific)
+        if (config('database.default') !== 'sqlite') {
+            DB::statement('
+                ALTER TABLE service_requests 
+                ADD CONSTRAINT valid_coordinates 
+                CHECK (latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180)
+            ');
+        }
     }
 
     /**
@@ -44,7 +46,9 @@ return new class extends Migration {
             $table->dropIndex(['latitude', 'longitude']);
         });
 
-        // Drop check constraint
-        DB::statement('ALTER TABLE service_requests DROP CONSTRAINT valid_coordinates');
+        // Drop check constraint (MySQL specific)
+        if (config('database.default') !== 'sqlite') {
+            DB::statement('ALTER TABLE service_requests DROP CONSTRAINT valid_coordinates');
+        }
     }
 };

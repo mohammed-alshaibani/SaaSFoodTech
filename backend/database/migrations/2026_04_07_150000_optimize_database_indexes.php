@@ -192,9 +192,13 @@ return new class extends Migration {
             $table->dropIndex('idx_requests_title');
             $table->dropIndex('idx_requests_description');
 
-            // Drop spatial index if it exists
+            // Drop spatial index if it exists (MySQL specific)
             if (config('database.default') === 'mysql') {
-                DB::statement('ALTER TABLE service_requests DROP INDEX idx_requests_spatial');
+                try {
+                    DB::statement('ALTER TABLE service_requests DROP INDEX idx_requests_spatial');
+                } catch (\Exception $e) {
+                    // Ignore if not exists
+                }
             }
         });
 
