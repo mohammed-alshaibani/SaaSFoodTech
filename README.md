@@ -4,7 +4,7 @@ A robust, fullstack MVP for a service marketplace where customers create service
 
 ---
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 The system is designed as a modular monolith focused on scalability and clarity. 
 
@@ -15,7 +15,7 @@ The system is designed as a modular monolith focused on scalability and clarity.
 
 ---
 
-## 📂 Folder Structure
+## Folder Structure
 
 ### � Detailed Folder Structure
 
@@ -29,7 +29,7 @@ The system is designed as a modular monolith focused on scalability and clarity.
 - `database/migrations`: Relational schema for Users, Roles, Requests, and Subscriptions.
 - `routes/api.php`: Centralized, clean, and version-ready API routes.
 
-#### **🎨 Frontend (`/frontend`)**
+####  Frontend (`/frontend`)**
 - `app/dashboard`: Modular views for **Admin**, **Provider**, and **Customer** tailored to role-specific requirements.
 - `app/(auth)`: Secure flows for login and multi-role registration.
 - `components/`: UI library categorized into **Layouts**, **Auth**, **Subscription**, and **Animations**.
@@ -39,7 +39,7 @@ The system is designed as a modular monolith focused on scalability and clarity.
 
 ---
 
-## 🏗️ Architecture & Design Patterns
+## Architecture & Design Patterns
 
 The project follows **SOLID principles** and clear architectural patterns to ensure high quality and maintainability.
 
@@ -57,8 +57,9 @@ The project follows **SOLID principles** and clear architectural patterns to ens
 - **Dependency Inversion**: High-level modules don't depend on low-level UI details; they communicate via standardized API DTOs and Interfaces.
 
 ---
+Key Features & Implementation
 
-## 🔐 RBAC Design (Roles & Permissions)
+### 1. 🔐 Advanced RBAC Design
 
 The platform implements an **Advanced RBAC** system using a combination of `Spatie/Laravel-Permission` and custom middleware.
 
@@ -68,13 +69,34 @@ The platform implements an **Advanced RBAC** system using a combination of `Spat
     - **Provider Admin**: Can manage permissions for their own team/employees.
     - **Provider Employee**: Can accept/complete requests but has limited management access.
     - **Customer**: Strictly limited to their own request lifecycle.
-3. **Enforcement**: 
-    - **API Level**: Handled via `ApiSecurityMiddleware` and `CheckPermission` middleware which validates the user's role/permission before every request.
-    - **UI Level**: Components are conditionally rendered based on permissions provided by the `AuthorizationContext`.
+-   **Dynamic Permissions**: Permissions are not hardcoded. Administrators can revoke/assign permissions (`request.create`, `request.accept`, etc.) via the Admin Dashboard.
+-   **Enforcement**: 
+    -   **API Level**: Handled via `CheckPermission` middleware.
+    -   **UI Level**: Context-aware rendering based on user permission sets.
+
+### 2.  Geolocation & Proximity
+-   **Storage**: Coordinates (Lat/Long) are stored with every Service Request and Provider profile.
+-   **Search**: Uses the **Haversine Formula** with MySQL's `ST_Distance_Sphere` for millisecond-latency nearby request filtering (default 50km radius).
+-   **MVP Optimization**: Includes a bounding-box fallback logic for non-spatial databases (SQLite) used in testing.
+
+### 3.  AI-Powered Automation
+Included an AI enhancement feature to improve service quality:
+-   **Gemini AI Integration**: Automatically "professionalizes" service descriptions during creation using Google's Gemini 1.5 Flash API.
+-   **Reliability**: Implements a **Local Fallback Engine** that uses rule-based text processing if the external AI API is unavailable or has limited quota.
+
+### 4.  Subscription & Feature Gating
+-   **Logic**: enforced via `MainService` and `User` model scopes.
+-   **Limits**: 
+    -   **Free Users**: Capped at 3 active requests per month.
+    -   **Pro Users**: Unlimited requests and access to AI enhancement features.
+-   **Mock Workflow**: Includes a simulated payment/upgrade flow to demonstrate system extensibility for Stripe/PayPal.
 
 ---
 
-## 💡 Key Design Decisions & Trade-offs
+##  RBAC Design (Roles & Permissions)
+
+
+##  Key Design Decisions & Trade-offs
 
 - **Pattern Simplicity**: Chose to collapse complex Service/Repository layers into straightforward Controllers for the MVP. This increases readability and simplifies the onboarding process for new developers (Line 115 of requirements).
 - **Geolocation Strategy**: Implemented a mathematical approach (Haversine formula) for "Nearby" filtering directly in the database logic to avoid external API costs while maintaining high accuracy.
@@ -83,9 +105,9 @@ The platform implements an **Advanced RBAC** system using a combination of `Spat
 
 ---
 
-## 📋 Setup Instructions
+##  Setup Instructions
 
-### 🐳 Using Docker (Recommended)
+### Using Docker (Recommended)
 1. **Start the environment**:
    ```bash
    docker-compose up -d
@@ -113,20 +135,17 @@ The platform implements an **Advanced RBAC** system using a combination of `Spat
 
 ---
 
-## 🧪 API Documentation & Tests
+## API Documentation & Tests
 
 - **API Docs**: A full Postman collection is located at the root provided as `SaaSFoodTech.postman_collection.json`. It includes 50+ endpoints covering all lifecycles.
 - **Tests**: Run `php artisan test` in the `/backend` directory to verify core functionality and RBAC enforcement.
 
 ---
 
-## 🔧 Future Improvements
+##  Future Improvements
 
 - **Mobile Application**: Porting the Next.js logic to React Native for field-ready providers.
 - **Advanced Maps**: Integrating Google Maps/Leaflet for visual request clustering.
 - **Payment Gateway**: Moving from mock payment to Stripe/PayPal production integration.
 - **ElasticSearch**: Implementing full-text search and advanced AI-driven matching engines.
 
----
-
-**Built for the SaaSFoodTech evaluation.**
