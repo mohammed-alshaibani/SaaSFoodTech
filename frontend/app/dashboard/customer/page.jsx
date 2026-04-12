@@ -199,17 +199,16 @@ export default function CustomerDashboard() {
                             </p>
                         </div>
                     </div>
-                    <button
-                        onClick={() => setShowForm(v => !v)}
-                        disabled={limitReached}
+                    <Link
+                        href="/dashboard/customer/requests"
                         className={`flex items-center justify-center gap-2 px-6 py-3 rounded-full text-sm font-bold transition-all shadow-sm
                             ${limitReached
-                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
+                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200 pointer-events-none'
                                 : 'bg-[#7C3AED] hover:bg-purple-700 text-white shadow-purple-500/20 active:scale-[0.98]'}`}
                     >
-                        {showForm ? <X size={18} /> : <Plus size={18} />}
-                        {showForm ? t('dashboard.cancel') : t('dashboard.newRequest')}
-                    </button>
+                        <Plus size={18} />
+                        {t('dashboard.newRequest')}
+                    </Link>
                 </div>
 
                 {/* Sub Banner */}
@@ -224,8 +223,8 @@ export default function CustomerDashboard() {
                                 <p className="text-white/90 font-medium text-sm mt-1">{t('dashboard.usage')}: {requestCount}/{freeLimit} {t('dashboard.requestsUsed') || 'طلبات مستخدمة'}</p>
                             </div>
                         </div>
-                        <Link href="/subscription" className="mt-4 md:mt-0 px-6 py-3 bg-white text-amber-600 rounded-xl text-sm font-bold hover:bg-gray-50 transition active:scale-95 shadow-md flex items-center gap-2">
-                            {t('dashboard.upgradePro')} <ArrowUpRight size={18} />
+                        <Link href="/dashboard/customer/plans" className="mt-4 md:mt-0 px-6 py-3 bg-white text-amber-600 rounded-xl text-sm font-bold hover:bg-gray-50 transition active:scale-95 shadow-md flex items-center gap-2">
+                            {t('dashboard.upgradePro') || 'الترقية إلى Pro'} <ArrowUpRight size={18} />
                         </Link>
                     </div>
                 )}

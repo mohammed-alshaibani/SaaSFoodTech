@@ -9,6 +9,8 @@ class Permission extends SpatiePermission
 {
     use HasFactory;
 
+    protected $guard_name = 'sanctum';
+
     protected $fillable = [
         'name',
         'guard_name',

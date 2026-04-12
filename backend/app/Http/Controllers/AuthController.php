@@ -19,39 +19,41 @@ class AuthController extends Controller
      */
     public function register(RegisterRequest $request): JsonResponse
     {
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'plan' => 'free',
-        ]);
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($request) {
+            $user = User::create([
+                'name' => $request->name,
+                'email' => $request->email,
+                'password' => Hash::make($request->password),
+                'plan' => 'free',
+            ]);
 
-        // Role assignment logic
-        $role = $request->role;
-        
-        // Log the received role for debugging
-        \Log::info('Registration role assignment', [
-            'requested_role' => $role,
-            'user_id' => $user->id
-        ]);
-        
-        if ($role === 'provider')
-            $role = 'provider_admin';
-        
-        // Ensure only valid roles are assigned
-        $validRoles = ['admin', 'provider_admin', 'customer'];
-        if (!in_array($role, $validRoles))
-            $role = 'customer';
+            // Role assignment logic
+            $role = $request->role;
 
-        $user->assignRole($role, 'sanctum');
+            // Log the received role for debugging
+            \Log::info('Registration role assignment', [
+                'requested_role' => $role,
+                'user_id' => $user->id
+            ]);
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+            if ($role === 'provider')
+                $role = 'provider_admin';
 
-        return response()->json([
-            'access_token' => $token,
-            'token_type' => 'Bearer',
-            'user' => $this->buildUserPayload($user),
-        ], 201);
+            // Ensure only valid roles are assigned
+            $validRoles = ['admin', 'provider_admin', 'customer'];
+            if (!in_array($role, $validRoles))
+                $role = 'customer';
+
+            $user->assignRole($role);
+
+            $token = $user->createToken('auth_token')->plainTextToken;
+
+            return response()->json([
+                'access_token' => $token,
+                'token_type' => 'Bearer',
+                'user' => $this->buildUserPayload($user),
+            ], 201);
+        });
     }
 
     /**

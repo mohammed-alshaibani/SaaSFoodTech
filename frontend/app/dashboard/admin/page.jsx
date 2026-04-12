@@ -17,7 +17,8 @@ import {
     Crown,
     AlertTriangle,
     RefreshCcw,
-    CreditCard
+    CreditCard,
+    ChevronDown
 } from 'lucide-react';
 
 function Badge({ plan, t }) {
@@ -55,10 +56,18 @@ export default function AdminDashboard() {
     const [message, setMessage] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [meta, setMeta] = useState(null);
+    const [dynamicPlans, setDynamicPlans] = useState([]);
 
     const showMessage = useCallback((text, type = 'info') => {
         setMessage({ text, type });
         setTimeout(() => setMessage(null), 3500);
+    }, []);
+
+    useEffect(() => {
+        api.get('/subscription/plans').then(res => {
+            const plans = (res.data.data || []).map(p => ({ value: p.name, label: p.display_name || p.name }));
+            if (plans.length > 0) setDynamicPlans(plans);
+        }).catch(err => console.error("Failed to fetch dynamic plans", err));
     }, []);
 
     const fetchUsers = useCallback(async (page = 1) => {
@@ -95,12 +104,9 @@ export default function AdminDashboard() {
         fetchStats();
     }, [currentPage, fetchUsers, fetchStats]);
 
-    const togglePlan = async (user) => {
-        const newPlan = user.plan === 'free' ? 'premium' : 'free';
-        console.log(`Toggling plan for user ${user.id} from ${user.plan} to ${newPlan}`);
+    const updatePlan = async (user, newPlan) => {
         try {
-            const response = await api.patch(`/admin/users/${user.id}/plan`, { plan: newPlan });
-            console.log('Plan update response:', response);
+            await api.patch(`/admin/users/${user.id}/plan`, { plan: newPlan });
             showMessage(`${user.name} ${t('dashboard.planUpdateSuccess') || 'تم تحديث الخطة بنجاح'}`, 'success');
             // Add delay to ensure backend processes the update
             setTimeout(() => {
@@ -166,8 +172,8 @@ export default function AdminDashboard() {
                             <table className="w-full text-sm text-left">
                                 <thead>
                                     <tr className="bg-gray-50/80 border-b border-gray-200">
-                                        {['User Identifier', 'Subscription', 'Access Level', 'Direct Control'].map((h, i) => (
-                                            <th key={h} className={`px-8 py-5 text-[#1A202C] text-[10px] font-black uppercase tracking-widest ${i === 0 ? 'min-w-[300px]' : ''}`}>
+                                        {['الاسم', 'البريد الإلكتروني', 'الخطة', 'الدور', 'الإجراءات'].map((h, i) => (
+                                            <th key={h} className={`px-8 py-5 text-[#1A202C] text-[10px] font-black uppercase tracking-widest ${i === 0 ? 'min-w-[200px]' : ''}`}>
                                                 {h}
                                             </th>
                                         ))}
@@ -184,11 +190,11 @@ export default function AdminDashboard() {
                                                         <div className="w-12 h-12 bg-white border border-gray-200 rounded-xl flex items-center justify-center text-[#1A202C] font-black shadow-sm group-hover:border-[#7C3AED]/30 group-hover:text-[#7C3AED] transition-colors">
                                                             {u.name?.[0]?.toUpperCase()}
                                                         </div>
-                                                        <div className="min-w-0">
-                                                            <p className="text-sm font-black text-[#1A202C] tracking-tight truncate">{u.name}</p>
-                                                            <p className="text-[11px] font-bold text-gray-500 truncate mt-0.5">{u.email}</p>
-                                                        </div>
+                                                        <span className="text-sm font-black text-[#1A202C] tracking-tight truncate">{u.name}</span>
                                                     </div>
+                                                </td>
+                                                <td className="px-8 py-6">
+                                                    <p className="text-[11px] font-bold text-gray-500 truncate mt-0.5">{u.email}</p>
                                                 </td>
                                                 <td className="px-8 py-6"><Badge plan={u.plan} t={t} /></td>
                                                 <td className="px-8 py-6">
@@ -202,13 +208,30 @@ export default function AdminDashboard() {
                                                 </td>
                                                 <td className="px-8 py-6">
                                                     <div className="flex gap-3">
-                                                        <button
-                                                            onClick={() => togglePlan(u)}
-                                                            className={`flex items-center justify-center gap-2 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${u.plan === 'free' ? 'bg-[#7C3AED] text-white shadow-md shadow-purple-500/20 hover:bg-purple-700' : 'bg-gray-100 text-gray-500 hover:text-[#1A202C] hover:bg-gray-200'}`}
-                                                        >
-                                                            {u.plan === 'free' ? <Zap size={14} fill="currentColor" /> : <Shield size={14} />}
-                                                            {u.plan === 'free' ? t('dashboard.upgrade') || 'UPGRADE' : t('dashboard.downgrade') || 'DOWNGRADE'}
-                                                        </button>
+                                                        {dynamicPlans.length > 0 ? (
+                                                            <div className="relative">
+                                                                <select
+                                                                    value={u.plan}
+                                                                    onChange={(e) => updatePlan(u, e.target.value)}
+                                                                    className="appearance-none pr-8 pl-4 py-2 border border-gray-200 rounded-xl text-[11px] font-black text-gray-700 bg-white outline-none focus:border-[#7C3AED] focus:ring-1 focus:ring-[#7C3AED] cursor-pointer transition uppercase tracking-widest min-w-[120px]"
+                                                                >
+                                                                    {dynamicPlans.map(plan => (
+                                                                        <option key={plan.value} value={plan.value}>{plan.label}</option>
+                                                                    ))}
+                                                                </select>
+                                                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
+                                                                    <ChevronDown size={14} />
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => updatePlan(u, u.plan === 'free' ? 'premium' : 'free')}
+                                                                className={`flex items-center justify-center gap-2 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${u.plan === 'free' ? 'bg-[#7C3AED] text-white shadow-md shadow-purple-500/20 hover:bg-purple-700' : 'bg-gray-100 text-gray-500 hover:text-[#1A202C] hover:bg-gray-200'}`}
+                                                            >
+                                                                {u.plan === 'free' ? <Zap size={14} fill="currentColor" /> : <Shield size={14} />}
+                                                                {u.plan === 'free' ? t('dashboard.upgrade') || 'UPGRADE' : t('dashboard.downgrade') || 'DOWNGRADE'}
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>

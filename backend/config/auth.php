@@ -45,6 +45,11 @@ return [
             'driver' => env('AUTH_API_DRIVER', 'sanctum'),
             'provider' => 'users',
         ],
+
+        'sanctum' => [
+            'driver' => 'sanctum',
+            'provider' => 'users',
+        ],
     ],
 
     /*

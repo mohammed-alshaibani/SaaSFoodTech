@@ -17,3 +17,8 @@ yarn-error.log
 /.fleet
 /.idea
 /.vscode
+
+# Runtime / process files
+supervisord.log
+supervisord.pid
+*.pid

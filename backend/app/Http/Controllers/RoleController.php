@@ -88,9 +88,12 @@ class RoleController extends Controller
      */
     public function update(Request $request, $id): JsonResponse
     {
-        try {
-            $role = Role::findOrFail($id);
+        $role = Role::find($id);
+        if (!$role) {
+            return response()->json(['message' => 'Role not found'], 404);
+        }
 
+        try {
             $validated = $request->validate([
                 'name' => ['required', 'string', 'max:255', Rule::unique('roles')->ignore($role->id)->where('guard_name', 'sanctum')],
                 'permissions' => 'nullable|array',
@@ -117,7 +120,7 @@ class RoleController extends Controller
 
             return response()->json([
                 'message' => 'Role updated successfully',
-                'role' => $role->fresh()->load('permissions')
+                'data' => $role->fresh()->load('permissions')
             ]);
 
         } catch (\Exception $e) {
@@ -133,16 +136,12 @@ class RoleController extends Controller
      */
     public function destroy($id): JsonResponse
     {
+        $role = Role::find($id);
+        if (!$role) {
+            return response()->json(['message' => 'Role not found'], 404);
+        }
+
         try {
-            // Check if role exists without loading model
-            $role = \DB::table('roles')->where('id', $id)->first();
-
-            if (!$role) {
-                return response()->json([
-                    'error' => 'Role not found'
-                ], 404);
-            }
-
             // Protect critical system roles
             if (in_array($role->name, ['admin', 'super-admin'])) {
                 return response()->json([
@@ -151,8 +150,8 @@ class RoleController extends Controller
                 ], 403);
             }
 
-            // Delete directly without loading model
-            \DB::table('roles')->where('id', $id)->delete();
+            $role->delete();
+            app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
 
             return response()->json([
                 'message' => 'Role deleted successfully'

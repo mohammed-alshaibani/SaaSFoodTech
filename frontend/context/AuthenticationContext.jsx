@@ -95,6 +95,47 @@ export function AuthenticationProvider({ children }) {
         }
     }, []);
 
+    const register = useCallback(async (formData) => {
+        setLoading(true);
+        setError(null);
+
+        try {
+            const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+            const response = await fetch(`${baseUrl}/register`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify(formData),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                // Return data so component can handle validation errors
+                return { success: false, error: data.message || 'Registration failed', errors: data.errors };
+            }
+
+            const { access_token, user: userData } = data;
+            const role = userData.roles && userData.roles.length > 0 ? userData.roles[0] : 'customer';
+
+            await fetch('/api/session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: access_token, role }),
+            });
+
+            setUser(userData);
+            return { success: true, user: userData };
+        } catch (error) {
+            setError(error.message);
+            return { success: false, error: error.message };
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
     const logout = useCallback(async () => {
         setLoading(true);
 
@@ -108,7 +149,7 @@ export function AuthenticationProvider({ children }) {
             setUser(null);
             setError(null);
             setLoading(false);
-            
+
             // Force redirect to login and clear any client-side state
             if (typeof window !== 'undefined') {
                 window.location.href = '/login';
@@ -130,6 +171,7 @@ export function AuthenticationProvider({ children }) {
         error,
         isAuthenticated: !!user,
         login,
+        register,
         logout,
         refreshUser,
         clearError,

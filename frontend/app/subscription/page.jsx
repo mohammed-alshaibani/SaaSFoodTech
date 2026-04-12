@@ -97,29 +97,11 @@ export default function SubscriptionPage() {
 
     const handleUpgrade = async (planName) => {
         if (!isAuthenticated) {
-            router.push('/login?redirect=/subscription');
+            router.push('/register?redirect=/dashboard/customer/plans');
             return;
         }
 
-        if (planName === currentPlan) return;
-
-        setUpgrading(planName);
-        setMessage(null);
-
-        try {
-            const res = await api.post('/subscription/upgrade', {
-                plan: planName,
-                payment_method: 'credit_card',
-            });
-            setMessage({ type: 'success', text: res.data.message || 'Upgrade request submitted!' });
-            await refreshUser();
-            setCurrentPlan(planName);
-        } catch (err) {
-            const errorMsg = err.response?.data?.message || err.response?.data?.error || 'Upgrade failed';
-            setMessage({ type: 'error', text: errorMsg });
-        } finally {
-            setUpgrading(null);
-        }
+        router.push('/dashboard/customer/plans');
     };
 
     const getPlanIcon = (planName) => {
@@ -239,12 +221,11 @@ export default function SubscriptionPage() {
 
                                 {/* Plan Header */}
                                 <div className="text-center mb-6">
-                                    <div className={`w-16 h-16 mx-auto rounded-2xl flex items-center justify-center mb-4 ${
-                                        plan.name === 'free' ? 'bg-gray-100 text-gray-600' :
-                                        plan.name === 'basic' ? 'bg-blue-100 text-blue-600' :
-                                        plan.name === 'premium' ? 'bg-purple-100 text-purple-600' :
-                                        'bg-emerald-100 text-emerald-600'
-                                    }`}>
+                                    <div className={`w-16 h-16 mx-auto rounded-2xl flex items-center justify-center mb-4 ${plan.name === 'free' ? 'bg-gray-100 text-gray-600' :
+                                            plan.name === 'basic' ? 'bg-blue-100 text-blue-600' :
+                                                plan.name === 'premium' ? 'bg-purple-100 text-purple-600' :
+                                                    'bg-emerald-100 text-emerald-600'
+                                        }`}>
                                         <Icon size={32} />
                                     </div>
                                     <h3 className="text-xl font-black text-gray-900 mb-1">
@@ -267,12 +248,11 @@ export default function SubscriptionPage() {
                                 <ul className="space-y-3 mb-8">
                                     {(plan.features || []).map((feature, idx) => (
                                         <li key={idx} className="flex items-start gap-3">
-                                            <Check size={18} className={`mt-0.5 flex-shrink-0 ${
-                                                plan.name === 'free' ? 'text-gray-500' :
-                                                plan.name === 'basic' ? 'text-blue-500' :
-                                                plan.name === 'premium' ? 'text-purple-500' :
-                                                'text-emerald-500'
-                                            }`} />
+                                            <Check size={18} className={`mt-0.5 flex-shrink-0 ${plan.name === 'free' ? 'text-gray-500' :
+                                                    plan.name === 'basic' ? 'text-blue-500' :
+                                                        plan.name === 'premium' ? 'text-purple-500' :
+                                                            'text-emerald-500'
+                                                }`} />
                                             <span className="text-sm text-gray-600">{feature}</span>
                                         </li>
                                     ))}
@@ -282,19 +262,18 @@ export default function SubscriptionPage() {
                                 <button
                                     onClick={() => handleUpgrade(plan.name)}
                                     disabled={isCurrent || isUpgrading}
-                                    className={`w-full py-3 px-4 rounded-xl font-bold transition-all duration-200 ${
-                                        isCurrent
+                                    className={`w-full py-3 px-4 rounded-xl font-bold transition-all duration-200 ${isCurrent
                                             ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                             : isUpgrading
-                                            ? 'bg-gray-100 text-gray-400 cursor-wait'
-                                            : plan.name === 'free'
-                                            ? 'bg-gray-900 text-white hover:bg-gray-800'
-                                            : plan.name === 'basic'
-                                            ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-200'
-                                            : plan.name === 'premium'
-                                            ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 shadow-lg shadow-purple-200'
-                                            : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-200'
-                                    }`}
+                                                ? 'bg-gray-100 text-gray-400 cursor-wait'
+                                                : plan.name === 'free'
+                                                    ? 'bg-gray-900 text-white hover:bg-gray-800'
+                                                    : plan.name === 'basic'
+                                                        ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-200'
+                                                        : plan.name === 'premium'
+                                                            ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 shadow-lg shadow-purple-200'
+                                                            : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-200'
+                                        }`}
                                 >
                                     {isUpgrading ? (
                                         <span className="flex items-center justify-center gap-2">

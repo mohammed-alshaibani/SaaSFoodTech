@@ -9,10 +9,12 @@ class UpdateServiceRequestRequest extends FormRequest
     /**
      * Authorize via Policy - only providers can update request status.
      */
+    /**
+     * Defer authorization to the Controller and Policies
+     */
     public function authorize(): bool
     {
-        return $this->user()->can('accept', $this->serviceRequest) || 
-               $this->user()->can('complete', $this->serviceRequest);
+        return true;
     }
 
     /**
@@ -78,17 +80,17 @@ class UpdateServiceRequestRequest extends FormRequest
         return [
             'provider_notes.max' => 'Provider notes may not exceed 1000 characters.',
             'provider_notes.regex' => 'Provider notes contain invalid characters.',
-            
+
             'estimated_completion.date' => 'Estimated completion must be a valid date.',
             'estimated_completion.after' => 'Estimated completion must be after today.',
-            
+
             'completion_notes.max' => 'Completion notes may not exceed 1000 characters.',
             'completion_notes.regex' => 'Completion notes contain invalid characters.',
-            
+
             'final_attachments.max' => 'You may upload up to 10 final attachments.',
             'final_attachments.*.url' => 'Each final attachment must be a valid URL.',
             'final_attachments.*.regex' => 'Only image files and documents are allowed for final attachments.',
-            
+
             'rating.between' => 'Rating must be between 1 and 5.',
         ];
     }

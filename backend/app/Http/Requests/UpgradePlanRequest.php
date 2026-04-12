@@ -25,7 +25,7 @@ class UpgradePlanRequest extends FormRequest
             'plan' => [
                 'required',
                 'string',
-                'in:free,basic,premium,enterprise',
+                'exists:subscription_plans,name',
             ],
             'payment_method' => [
                 'nullable', // Optional - will default to credit_card
@@ -50,7 +50,7 @@ class UpgradePlanRequest extends FormRequest
     {
         return [
             'plan.required' => 'Please select a plan to upgrade to.',
-            'plan.in' => 'The selected plan is invalid. Available plans: free, basic, premium, enterprise.',
+            'plan.in' => 'The selected plan is invalid or does not exist.',
             'payment_method.required' => 'Please select a payment method.',
             'payment_method.in' => 'The payment method is invalid. Available methods: card, paypal, bank_transfer.',
             'payment_token.required_if' => 'Payment token is required for card payments.',

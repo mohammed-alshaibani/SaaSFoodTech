@@ -7,6 +7,12 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 use App\Models\ServiceRequest;
 
+/**
+ * CheckRequestLimit
+ * 
+ * ARCHITECTURAL NOTE: This middleware handles subscription gating directly
+ * for MVP clarity, instead of using separate resolver services.
+ */
 class CheckRequestLimit
 {
     /**

@@ -312,8 +312,25 @@ const translations = {
       pending: 'في الانتظار',
       completed: 'مكتملة',
       cancelled: 'ملغاة',
+      accepted: 'مقبول',
+      work_done: 'منجز',
       total: 'الإجمالي',
-      noRequests: 'لا توجد طلبات'
+      noRequests: 'لا توجد طلبات',
+      thisMonth: 'هذا الشهر',
+      search: 'بحث في الطلبات...',
+      allStatuses: 'جميع الحالات',
+      accept: 'قبول',
+      accepted: 'تم القبول بنجاح',
+      acceptError: 'فشل قبول الطلب',
+      complete: 'إكمال',
+      completed2: 'تم الإكمال بنجاح',
+      completeError: 'فشل إكمال الطلب',
+      fastResponse: 'استجابة سريعة',
+      fastResponseDesc: 'اقبل طلبات الخدمة في الوقت الفعلي وتواصل مع العملاء فوراً',
+      realTimeUpdates: 'تحديثات فورية',
+      realTimeUpdatesDesc: 'تلقّ إشعارات فورية عند وصول طلبات جديدة في منطقتك',
+      secureMessaging: 'تواصل آمن',
+      secureMessagingDesc: 'تواصل مع العملاء بشكل آمن وموثوق عبر المنصة'
     },
     subscriptions: {
       title: 'الاشتراكات',
@@ -811,8 +828,25 @@ const translations = {
       pending: 'Pending',
       completed: 'Completed',
       cancelled: 'Cancelled',
+      accepted: 'Accepted',
+      work_done: 'Work Done',
       total: 'Total',
-      noRequests: 'No requests found'
+      noRequests: 'No requests found',
+      thisMonth: 'This Month',
+      search: 'Search requests...',
+      allStatuses: 'All Statuses',
+      accept: 'Accept',
+      accepted2: 'Request accepted successfully',
+      acceptError: 'Failed to accept request',
+      complete: 'Complete',
+      completed2: 'Request completed successfully',
+      completeError: 'Failed to complete request',
+      fastResponse: 'Fast Response',
+      fastResponseDesc: 'Accept service requests in real-time and connect with customers instantly',
+      realTimeUpdates: 'Real-time Updates',
+      realTimeUpdatesDesc: 'Get instant notifications when new requests arrive in your area',
+      secureMessaging: 'Secure Messaging',
+      secureMessagingDesc: 'Communicate with customers securely and reliably through the platform'
     },
     subscriptions: {
       title: 'Subscriptions',
@@ -885,6 +919,12 @@ const translations = {
 const I18nContext = createContext(undefined);
 
 // Provider
+/**
+ * I18nContext
+ * 
+ * ARCHITECTURAL NOTE: Kept for RTL support and future-readiness for the Arab market.
+ * Provides lightweight translation strings and direction switching.
+ */
 export function I18nProvider({ children }) {
   const [locale, setLocale] = useState('ar'); // Default to Arabic
 

@@ -12,6 +12,9 @@ const api = axios.create({
     headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
     },
     timeout: 30000, // 30 second timeout
 });
@@ -51,11 +54,19 @@ export function clearTokenCache() {
     cachedToken = null;
 }
 
-// ─── Request interceptor: attach Bearer token ─────────────────────────────────
+// ─── Request interceptor: attach Bearer token + guarantee Content-Type ───────
 api.interceptors.request.use(async (config) => {
     const token = await getToken();
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
+    }
+    // Guarantee Content-Type for state-transition PATCH requests (accept, complete, etc.)
+    // Without a body, some browsers drop the Content-Type header causing 415.
+    if (['patch', 'put', 'post'].includes(config.method)) {
+        config.headers['Content-Type'] = 'application/json';
+        if (config.data === undefined || config.data === null) {
+            config.data = {};
+        }
     }
     return config;
 });

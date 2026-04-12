@@ -35,7 +35,7 @@ export default function ProviderRequestsPage() {
     const { user } = useAuth();
     const { t, language } = useI18n();
     const isRTL = language === 'ar';
-    
+
     const [requests, setRequests] = useState([]);
     const [filteredRequests, setFilteredRequests] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
@@ -46,8 +46,26 @@ export default function ProviderRequestsPage() {
 
     const fetchRequests = useCallback(async () => {
         try {
-            const res = await api.get('/requests');
-            const requestData = res.data.data || [];
+            // Fetch standard requests (own accepted/completed) and nearby discovering requests
+            const lat = user?.latitude || 24.7136; // Default to Riyadh if user lacks coords
+            const lng = user?.longitude || 46.6753;
+            const radius = 50; // 50km search radius
+
+            const [reqsRes, nearbyRes] = await Promise.all([
+                api.get('/requests'),
+                api.get(`/requests/nearby?latitude=${lat}&longitude=${lng}&radius=${radius}`)
+            ]);
+
+            const standardData = reqsRes.data.data || [];
+            const nearbyData = nearbyRes.data.data || [];
+
+            // Merge uniquely by ID
+            const mergedMap = new Map();
+            standardData.forEach(r => mergedMap.set(r.id, r));
+            nearbyData.forEach(r => mergedMap.set(r.id, r));
+
+            const requestData = Array.from(mergedMap.values());
+
             setRequests(requestData);
             setFilteredRequests(requestData);
         } catch (err) {
@@ -56,7 +74,7 @@ export default function ProviderRequestsPage() {
         } finally {
             setLoading(false);
         }
-    }, [t]);
+    }, [t, user]);
 
     const fetchStats = useCallback(async () => {
         try {
@@ -78,26 +96,26 @@ export default function ProviderRequestsPage() {
 
     useEffect(() => {
         let result = requests;
-        
+
         if (searchQuery) {
             const query = searchQuery.toLowerCase();
-            result = result.filter(r => 
+            result = result.filter(r =>
                 r.title?.toLowerCase().includes(query) ||
                 r.description?.toLowerCase().includes(query) ||
                 r.customer?.name?.toLowerCase().includes(query)
             );
         }
-        
+
         if (filterStatus !== 'all') {
             result = result.filter(r => r.status === filterStatus);
         }
-        
+
         setFilteredRequests(result);
     }, [searchQuery, filterStatus, requests]);
 
     const handleAccept = async (requestId) => {
         try {
-            await api.patch(`/requests/${requestId}/accept`);
+            await api.patch(`/requests/${requestId}/accept`, { _action: 'accept' });
             setMessage({ type: 'success', text: t('requests.accepted') || 'Request accepted' });
             fetchRequests();
         } catch (err) {
@@ -107,7 +125,7 @@ export default function ProviderRequestsPage() {
 
     const handleComplete = async (requestId) => {
         try {
-            await api.patch(`/requests/${requestId}/complete`);
+            await api.patch(`/requests/${requestId}/complete`, { _action: 'complete' });
             setMessage({ type: 'success', text: t('requests.completed') || 'Request completed' });
             fetchRequests();
         } catch (err) {
@@ -122,7 +140,7 @@ export default function ProviderRequestsPage() {
             amber: 'bg-amber-50 border-amber-200 text-amber-600',
             purple: 'bg-purple-50 border-purple-200 text-purple-600',
         };
-        
+
         return (
             <div className={`p-6 rounded-2xl border ${colors[color]} backdrop-blur-sm`}>
                 <div className="flex items-center justify-between">
@@ -146,7 +164,7 @@ export default function ProviderRequestsPage() {
             cancelled: { color: 'bg-red-100 text-red-700 border-red-200', label: t('requests.cancelled') || 'Cancelled' },
         };
         const configItem = config[status] || config.pending;
-        
+
         return (
             <span className={`px-3 py-1 rounded-full text-xs font-bold border ${configItem.color}`}>
                 {configItem.label}
@@ -160,7 +178,7 @@ export default function ProviderRequestsPage() {
             medium: 'bg-amber-100 text-amber-700 border-amber-200',
             low: 'bg-emerald-100 text-emerald-700 border-emerald-200',
         };
-        
+
         return (
             <span className={`px-3 py-1 rounded-full text-xs font-bold border ${colors[priority] || colors.medium}`}>
                 {priority || 'medium'}
@@ -195,33 +213,33 @@ export default function ProviderRequestsPage() {
 
                 {/* Stats Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <StatCard 
-                        icon={ClipboardList} 
-                        title={t('requests.total') || 'Total Requests'} 
-                        value={requests.length} 
-                        color="blue" 
+                    <StatCard
+                        icon={ClipboardList}
+                        title={t('requests.total') || 'Total Requests'}
+                        value={requests.length}
+                        color="blue"
                     />
-                    <StatCard 
-                        icon={Clock} 
-                        title={t('requests.pending') || 'Pending'} 
-                        value={requests.filter(r => r.status === 'pending').length} 
-                        color="amber" 
+                    <StatCard
+                        icon={Clock}
+                        title={t('requests.pending') || 'Pending'}
+                        value={requests.filter(r => r.status === 'pending').length}
+                        color="amber"
                     />
-                    <StatCard 
-                        icon={CheckCircle2} 
-                        title={t('requests.completed') || 'Completed'} 
-                        value={requests.filter(r => r.status === 'completed').length} 
-                        color="emerald" 
+                    <StatCard
+                        icon={CheckCircle2}
+                        title={t('requests.completed') || 'Completed'}
+                        value={requests.filter(r => r.status === 'completed').length}
+                        color="emerald"
                     />
-                    <StatCard 
-                        icon={TrendingUp} 
-                        title={t('requests.thisMonth') || 'This Month'} 
+                    <StatCard
+                        icon={TrendingUp}
+                        title={t('requests.thisMonth') || 'This Month'}
                         value={requests.filter(r => {
                             const created = new Date(r.created_at);
                             const now = new Date();
                             return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
-                        }).length} 
-                        color="purple" 
+                        }).length}
+                        color="purple"
                     />
                 </div>
 
@@ -286,7 +304,7 @@ export default function ProviderRequestsPage() {
                                                 <PriorityBadge priority={request.priority} />
                                             </div>
                                             <p className="text-gray-600 text-sm mb-3 line-clamp-2">{request.description}</p>
-                                            
+
                                             <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
                                                 <div className="flex items-center gap-1">
                                                     <User size={14} />
@@ -307,7 +325,7 @@ export default function ProviderRequestsPage() {
                                                 )}
                                             </div>
                                         </div>
-                                        
+
                                         {/* Actions */}
                                         <div className="flex items-center gap-2">
                                             {request.status === 'pending' && (
@@ -355,7 +373,7 @@ export default function ProviderRequestsPage() {
                             {t('requests.fastResponseDesc') || 'Respond to customer requests quickly and efficiently'}
                         </p>
                     </div>
-                    
+
                     <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-2xl p-6 border border-emerald-200">
                         <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center text-white mb-4">
                             <Bell size={24} />
@@ -367,7 +385,7 @@ export default function ProviderRequestsPage() {
                             {t('requests.realTimeUpdatesDesc') || 'Get instant notifications for new requests'}
                         </p>
                     </div>
-                    
+
                     <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-6 border border-purple-200">
                         <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center text-white mb-4">
                             <Shield size={24} />

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useI18n } from '@/context/I18nContext';
+import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import Link from 'next/link';
@@ -18,6 +19,8 @@ export default function RegisterForm() {
   });
   const [errors, setErrors] = useState({});
   const { t, isRTL } = useI18n();
+
+  const { register } = useAuth();
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -99,58 +102,22 @@ export default function RegisterForm() {
     if (!validateForm()) return;
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
+      const result = await register(formData);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        // Handle Laravel validation errors (often nested in 'errors' object)
-        if (data.errors) {
-          // Map backend errors to form fields
+      if (!result.success) {
+        if (result.errors) {
           const backendErrors = {};
-          Object.entries(data.errors).forEach(([field, messages]) => {
-            backendErrors[field] = messages[0]; // Take first error for each field
+          Object.entries(result.errors).forEach(([field, messages]) => {
+            backendErrors[field] = messages[0];
           });
-          
-          if (process.env.NODE_ENV === 'development') {
-            console.log('[RegisterForm] Backend validation errors:', backendErrors);
-          }
-          
           setErrors(prev => ({ ...prev, ...backendErrors }));
-          
-          // If no field-specific errors, show general error
-          if (Object.keys(backendErrors).length === 0) {
-            const firstError = Object.values(data.errors)[0]?.[0];
-            if (firstError) {
-              setErrors(prev => ({ ...prev, general: firstError }));
-            }
-          }
-          return; // Stop here, don't throw
+          return;
         }
-        throw new Error(data.message || t('auth.registerError'));
+        throw new Error(result.error);
       }
 
-      // Backend returns access_token
-      const { access_token, user } = data;
+      const user = result.user;
       const primaryRole = user.roles?.[0] ?? 'customer';
-
-      // Persist token + primary role in httpOnly cookie (same as login flow)
-      const sessionRes = await fetch('/api/session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: access_token, role: primaryRole }),
-      });
-
-      if (!sessionRes.ok) {
-        throw new Error('Failed to establish session after registration');
-      }
 
       // Check for redirect parameter
       const urlParams = new URLSearchParams(window.location.search);

@@ -78,8 +78,13 @@ class PermissionController extends Controller
     /**
      * Update the specified permission.
      */
-    public function update(Request $request, Permission $permission): JsonResponse
+    public function update(Request $request, $id): JsonResponse
     {
+        $permission = Permission::find($id);
+        if (!$permission) {
+            return response()->json(['message' => 'Permission not found'], 404);
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255', Rule::unique('permissions')->ignore($permission->id)->where('guard_name', 'sanctum')],
         ]);
@@ -94,7 +99,7 @@ class PermissionController extends Controller
 
             return response()->json([
                 'message' => 'Permission updated successfully',
-                'permission' => $permission->fresh()
+                'data' => $permission->fresh()
             ]);
 
         } catch (\Exception $e) {
@@ -110,18 +115,14 @@ class PermissionController extends Controller
      */
     public function destroy($id): JsonResponse
     {
+        $permission = Permission::find($id);
+        if (!$permission) {
+            return response()->json(['message' => 'Permission not found'], 404);
+        }
+
         try {
-            // Check if permission exists without loading model
-            $permission = \DB::table('permissions')->where('id', $id)->first();
-
-            if (!$permission) {
-                return response()->json([
-                    'error' => 'Permission not found'
-                ], 404);
-            }
-
-            // Delete directly without loading model
-            \DB::table('permissions')->where('id', $id)->delete();
+            $permission->delete();
+            app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
 
             return response()->json([
                 'message' => 'Permission deleted successfully'

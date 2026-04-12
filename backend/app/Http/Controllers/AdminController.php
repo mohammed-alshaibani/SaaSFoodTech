@@ -11,7 +11,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use Spatie\Permission\Models\Permission;
+use App\Models\Permission;
 
 class AdminController extends Controller
 {
@@ -23,7 +23,7 @@ class AdminController extends Controller
     {
         try {
             $perPage = $request->input('per_page', 20);
-            
+
             // Try to load with roles and permissions, fall back if tables don't exist
             try {
                 $users = User::with(['roles', 'permissions'])
@@ -50,7 +50,7 @@ class AdminController extends Controller
                 'exception' => get_class($e),
                 'trace' => $e->getTraceAsString(),
             ]);
-            
+
             return response()->json([
                 'message' => 'Failed to load users.',
                 'error' => config('app.debug') ? $e->getMessage() : 'Internal server error',
@@ -70,7 +70,7 @@ class AdminController extends Controller
                 'email' => 'required|email|max:255|unique:users,email',
                 'password' => 'required|string|min:8',
                 'role' => 'nullable|string',
-                'plan' => 'nullable|in:free,premium,enterprise',
+                'plan' => 'nullable|string',
             ]);
 
             $user = User::create([
@@ -110,8 +110,9 @@ class AdminController extends Controller
      * GET /api/admin/users/{user}
      * Show a single user with roles, permissions, and their service requests summary.
      */
-    public function showUser(User $user): JsonResponse
+    public function showUser($id): JsonResponse
     {
+        $user = User::findOrFail($id);
         $user->load(['roles', 'permissions']);
 
         return response()->json([
@@ -126,11 +127,12 @@ class AdminController extends Controller
      * PATCH /api/admin/users/{user}/plan
      * Toggle a user's subscription plan between free and paid.
      */
-    public function updatePlan(Request $request, User $user): JsonResponse
+    public function updatePlan(Request $request, $id): JsonResponse
     {
         try {
+            $user = User::findOrFail($id);
             $validated = $request->validate([
-                'plan' => ['required', Rule::in(['free', 'basic', 'paid', 'premium', 'enterprise'])],
+                'plan' => 'required|string',
             ]);
 
             \Log::info('[AdminController] Updating plan', [
@@ -188,8 +190,9 @@ class AdminController extends Controller
      *
      * Body: { "permissions": ["request.accept", "request.complete"] }
      */
-    public function syncPermissions(AssignPermissionsRequest $request, User $user): JsonResponse
+    public function syncPermissions(AssignPermissionsRequest $request, $id): JsonResponse
     {
+        $user = User::findOrFail($id);
         // Provider Admin scope guard — cannot escalate to admin-only permissions
         if (!$request->user()->hasRole('admin')) {
             $adminOnlyPermissions = ['user.manage', 'permission.assign'];
@@ -218,8 +221,9 @@ class AdminController extends Controller
      * DELETE /api/admin/users/{user}/permissions
      * Revoke ALL direct permissions (revert user to role defaults).
      */
-    public function revokeAllPermissions(User $user): JsonResponse
+    public function revokeAllPermissions($id): JsonResponse
     {
+        $user = User::findOrFail($id);
         $user->syncPermissions([]);
 
         return response()->json([
@@ -231,20 +235,28 @@ class AdminController extends Controller
      * PUT/PATCH /api/admin/users/{user}
      * Update user details (name, email, role, plan)
      */
-    public function updateUser(Request $request, User $user): JsonResponse
+    public function updateUser(Request $request, $id): JsonResponse
     {
         try {
+            $user = User::findOrFail($id);
             $validated = $request->validate([
                 'name' => 'nullable|string|max:255',
-                'email' => 'nullable|email|max:255|unique:users,email,' . $user->id,
+                'email' => ['nullable', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
                 'role' => 'nullable|string',
-                'plan' => 'nullable|in:free,premium,enterprise',
+                'plan' => 'nullable|string',
+                'password' => 'nullable|string|min:8',
             ]);
 
             $updateData = [];
-            if (isset($validated['name'])) $updateData['name'] = $validated['name'];
-            if (isset($validated['email'])) $updateData['email'] = $validated['email'];
-            if (isset($validated['plan'])) $updateData['plan'] = $validated['plan'];
+            if (isset($validated['name']))
+                $updateData['name'] = $validated['name'];
+            if (isset($validated['email']))
+                $updateData['email'] = $validated['email'];
+            if (isset($validated['plan']))
+                $updateData['plan'] = $validated['plan'];
+            if (isset($validated['password']) && !empty($validated['password'])) {
+                $updateData['password'] = \Illuminate\Support\Facades\Hash::make($validated['password']);
+            }
 
             if (!empty($updateData)) {
                 $user->update($updateData);
@@ -287,9 +299,10 @@ class AdminController extends Controller
      * DELETE /api/admin/users/{user}
      * Delete a user
      */
-    public function deleteUser(User $user): JsonResponse
+    public function deleteUser($id): JsonResponse
     {
         try {
+            $user = User::findOrFail($id);
             $user->delete();
 
             return response()->json([
@@ -309,8 +322,9 @@ class AdminController extends Controller
      * Grant a single direct permission to a user (Advanced RBAC).
      * Body: { "permission": "request.accept", "reason": "...", "expires_at": "2026-01-01" }
      */
-    public function grantDirectPermission(Request $request, User $user): JsonResponse
+    public function grantDirectPermission(Request $request, $id): JsonResponse
     {
+        $user = User::findOrFail($id);
         $validated = $request->validate([
             'permission' => ['required', 'string'],
         ]);
@@ -341,9 +355,10 @@ class AdminController extends Controller
      * DELETE /api/users/{user}/permissions/{permission}
      * Revoke a single direct permission from a user.
      */
-    public function revokeDirectPermission(Request $request, User $user, string $permission): JsonResponse
+    public function revokeDirectPermission(Request $request, $id, string $permission): JsonResponse
     {
         try {
+            $user = User::findOrFail($id);
             if (!$user->hasPermissionTo($permission)) {
                 return response()->json([
                     'success' => false,
@@ -377,9 +392,10 @@ class AdminController extends Controller
      * GET /api/users/{user}/permissions
      * Show all effective permissions for a given user.
      */
-    public function getUserPermissions(User $user): JsonResponse
+    public function getUserPermissions($id): JsonResponse
     {
         try {
+            $user = User::findOrFail($id);
             $user->load(['roles', 'permissions']);
 
             return response()->json([
@@ -459,7 +475,7 @@ class AdminController extends Controller
                 'exception' => get_class($e),
                 'trace' => $e->getTraceAsString(),
             ]);
-            
+
             return response()->json([
                 'message' => 'Failed to load dashboard statistics.',
                 'error' => config('app.debug') ? $e->getMessage() : 'Internal server error',
@@ -572,8 +588,12 @@ class AdminController extends Controller
      * NOTE: This endpoint only supports PATCH method, not PUT.
      * Frontend should use api.patch() for plan updates.
      */
-    public function updatePlanDetails(Request $request, SubscriptionPlan $plan): JsonResponse
+    public function updatePlanDetails(Request $request, $id): JsonResponse
     {
+        $plan = SubscriptionPlan::find($id);
+        if (!$plan)
+            return response()->json(['message' => 'Plan not found'], 404);
+
         try {
             $validated = $request->validate([
                 'name' => 'nullable|string|max:255',
@@ -588,14 +608,22 @@ class AdminController extends Controller
             ]);
 
             $updateData = [];
-            if (isset($validated['name'])) $updateData['name'] = $validated['name'];
-            if (isset($validated['name_ar'])) $updateData['display_name'] = $validated['name_ar'];
-            if (isset($validated['description'])) $updateData['description'] = $validated['description'];
-            if (isset($validated['price'])) $updateData['price'] = $validated['price'];
-            if (isset($validated['interval'])) $updateData['billing_cycle'] = $validated['interval'];
-            if (isset($validated['features'])) $updateData['features'] = $validated['features'];
-            if (isset($validated['limits'])) $updateData['limits'] = $validated['limits'];
-            if (isset($validated['is_active'])) $updateData['is_active'] = $validated['is_active'];
+            if (isset($validated['name']))
+                $updateData['name'] = $validated['name'];
+            if (isset($validated['name_ar']))
+                $updateData['display_name'] = $validated['name_ar'];
+            if (isset($validated['description']))
+                $updateData['description'] = $validated['description'];
+            if (isset($validated['price']))
+                $updateData['price'] = $validated['price'];
+            if (isset($validated['interval']))
+                $updateData['billing_cycle'] = $validated['interval'];
+            if (isset($validated['features']))
+                $updateData['features'] = $validated['features'];
+            if (isset($validated['limits']))
+                $updateData['limits'] = $validated['limits'];
+            if (isset($validated['is_active']))
+                $updateData['is_active'] = $validated['is_active'];
 
             $plan->update($updateData);
 
@@ -616,8 +644,12 @@ class AdminController extends Controller
      * DELETE /api/admin/plans/{plan}
      * Delete a subscription plan
      */
-    public function deletePlan(SubscriptionPlan $plan): JsonResponse
+    public function deletePlan($id): JsonResponse
     {
+        $plan = SubscriptionPlan::find($id);
+        if (!$plan)
+            return response()->json(['message' => 'Plan not found'], 404);
+
         try {
             $plan->delete();
             return response()->json([

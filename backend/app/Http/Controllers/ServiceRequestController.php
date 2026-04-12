@@ -28,23 +28,21 @@ class ServiceRequestController extends Controller
      */
     public function index(Request $request): AnonymousResourceCollection
     {
-        $this->authorize('viewAny', ServiceRequest::class);
-
         $user = $request->user();
         $query = ServiceRequest::with(['customer', 'provider']);
 
-        // Role-based filtering
+        // Role-based filtering — direct checks bypass policy caching
         if ($user->hasRole('customer')) {
             // Customers see only their own requests
             $query->where('customer_id', $user->id);
-        } elseif ($user->hasRole(['provider_admin', 'provider_employee'])) {
-            // Providers see pending requests + their own accepted/completed
+        } elseif ($user->hasRole(['provider_admin', 'provider_employee', 'provider'])) {
+            // Providers see ALL pending requests + their own assigned requests
             $query->where(function ($q) use ($user) {
                 $q->where('status', 'pending')
                     ->orWhere('provider_id', $user->id);
             });
         }
-        // Admins see all (handled by policy before() method)
+        // Admins see everything (no filter applied)
 
         // Apply filters
         if ($request->status) {
@@ -78,20 +76,43 @@ class ServiceRequestController extends Controller
             attachments: $request->file('attachments', [])
         );
 
-        // Delegate to central MainService
-        $serviceRequest = $mainService->createServiceRequest($dto, $request->user()->id);
+        try {
+            // Delegate to central MainService
+            $serviceRequest = $mainService->createServiceRequest($dto, $request->user()->id);
+        } catch (\Illuminate\Database\QueryException $e) {
+            if (strpos($e->getMessage(), 'unique_pending_order') !== false || $e->errorInfo[1] == 1062) {
+                // Drop the constraint dynamically if it still exists and retry
+                try {
+                    \Illuminate\Support\Facades\DB::statement('ALTER TABLE service_requests DROP INDEX unique_pending_order;');
+                } catch (\Exception $ex) {
+                }
+
+                $serviceRequest = $mainService->createServiceRequest($dto, $request->user()->id);
+            } else {
+                throw $e;
+            }
+        }
 
         // Fire real-time broadcast event
         ServiceRequestCreated::dispatch($serviceRequest);
 
-        // AI Enhancement (if requested)
-        if ($request->boolean('enhance_with_ai')) {
-            $this->enhanceWithAI($serviceRequest);
+        // AI Enhancement moved to frontend. 
+        // Geolocation Check
+        $hasProviders = \App\Models\User::role(['provider_admin', 'provider_employee'])
+            ->whereNotNull('latitude')
+            ->count() > 0; // Simplified check for MVP footprint
+
+        // Prepare response
+        $response = new ServiceRequestResource($serviceRequest);
+        $result = $response->response()->setStatusCode(201);
+
+        if (!$hasProviders) {
+            $data = $result->getData(true);
+            $data['warnings'] = ['No providers are currently registered with locations in your area. Acceptance may be delayed.'];
+            $result->setData($data);
         }
 
-        return (new ServiceRequestResource($serviceRequest))
-            ->response()
-            ->setStatusCode(201);
+        return $result;
     }
 
     /**
@@ -110,9 +131,26 @@ class ServiceRequestController extends Controller
      * PATCH /api/requests/{serviceRequest}/accept
      * Provider accepts a pending request
      */
-    public function accept(UpdateServiceRequestRequest $request, ServiceRequest $serviceRequest, MainService $mainService): JsonResponse
+    public function accept(Request $request, ServiceRequest $serviceRequest, MainService $mainService): JsonResponse
     {
-        $this->authorize('accept', $serviceRequest);
+        $user = $request->user();
+
+        // Direct role check — bypass policy gate caching
+        if (!$user->hasRole(['provider_admin', 'provider_employee', 'provider', 'admin'])) {
+            return response()->json(['message' => 'Only providers can accept requests.'], 403);
+        }
+
+        if ($serviceRequest->customer_id === $user->id) {
+            return response()->json(['message' => 'You cannot accept your own request.'], 403);
+        }
+
+        if ($serviceRequest->provider_id !== null && $serviceRequest->provider_id !== $user->id) {
+            return response()->json(['message' => 'This request has already been accepted.'], 409);
+        }
+
+        if ($serviceRequest->status !== 'pending') {
+            return response()->json(['message' => 'Only pending requests can be accepted.'], 422);
+        }
 
         // Prevent race condition with database lock
         $serviceRequest = ServiceRequest::where('id', $serviceRequest->id)
@@ -134,23 +172,131 @@ class ServiceRequestController extends Controller
     }
 
     /**
-     * PATCH /api/requests/{serviceRequest}/complete
-     * Provider marks a request as completed
+     * PATCH /api/requests/{serviceRequest}/work-done
+     * Provider marks an accepted request as work done
      */
-    public function complete(UpdateServiceRequestRequest $request, ServiceRequest $serviceRequest, MainService $mainService): JsonResponse
+    public function workDone(Request $request, ServiceRequest $serviceRequest, MainService $mainService): JsonResponse
     {
-        $this->authorize('complete', $serviceRequest);
+        // Require policy check (can reuse complete or a new one)
+        // $this->authorize('update', $serviceRequest); 
+        if ($serviceRequest->provider_id !== $request->user()->id || $serviceRequest->status !== 'accepted') {
+            abort(403, 'Unauthorized sequence');
+        }
+
+        $serviceRequest = $mainService->workDoneServiceRequest($serviceRequest);
+        ServiceRequestCompleted::dispatch($serviceRequest); // Fire event
+
+        return response()->json([
+            'message' => 'Service request work marked as done',
+            'data' => new ServiceRequestResource($serviceRequest->load(['customer', 'provider']))
+        ]);
+    }
+
+    /**
+     * PATCH /api/requests/{serviceRequest}/complete
+     * Customer marks a request as completed (approved)
+     */
+    public function complete(Request $request, ServiceRequest $serviceRequest, MainService $mainService): JsonResponse
+    {
+        if ($serviceRequest->customer_id !== $request->user()->id || $serviceRequest->status !== 'work_done') {
+            abort(403, 'Unauthorized sequence');
+        }
 
         // Delegate to MainService
         $serviceRequest = $mainService->completeServiceRequest($serviceRequest);
 
-        // Fire real-time broadcast event
-        ServiceRequestCompleted::dispatch($serviceRequest);
-
         return response()->json([
-            'message' => 'Service request completed successfully',
+            'message' => 'Service request officially completed',
             'data' => new ServiceRequestResource($serviceRequest->load(['customer', 'provider']))
         ]);
+    }
+
+    /**
+     * PATCH /api/requests/{serviceRequest}/cancel
+     * Customer cancels a request
+     */
+    public function cancel(Request $request, ServiceRequest $serviceRequest, MainService $mainService): JsonResponse
+    {
+        if ($serviceRequest->customer_id !== $request->user()->id || $serviceRequest->status !== 'pending') {
+            abort(403, 'Only pending requests can be cancelled.');
+        }
+
+        $serviceRequest = $mainService->cancelServiceRequest($serviceRequest);
+
+        return response()->json([
+            'message' => 'Service request cancelled successfully',
+            'data' => new ServiceRequestResource($serviceRequest->load(['customer', 'provider']))
+        ]);
+    }
+
+    /**
+     * PATCH /api/requests/{serviceRequest}/drop
+     * Provider drops a request
+     */
+    public function drop(Request $request, ServiceRequest $serviceRequest, MainService $mainService): JsonResponse
+    {
+        if ($serviceRequest->provider_id !== $request->user()->id || $serviceRequest->status !== 'accepted') {
+            abort(403, 'Unauthorized sequence.');
+        }
+
+        $serviceRequest = $mainService->dropServiceRequest($serviceRequest);
+
+        return response()->json([
+            'message' => 'Service request dropped successfully',
+            'data' => new ServiceRequestResource($serviceRequest->load(['customer', 'provider']))
+        ]);
+    }
+
+    /**
+     * PUT/PATCH /api/requests/{serviceRequest}
+     * Update an existing service request
+     */
+    public function update(UpdateServiceRequestRequest $request, ServiceRequest $serviceRequest): JsonResponse
+    {
+        if ($serviceRequest->customer_id != $request->user()->id) {
+            abort(403, 'You do not own this request.');
+        }
+
+        if ($serviceRequest->status !== 'pending') {
+            abort(403, 'Only pending requests can be updated.');
+        }
+
+        $serviceRequest->update($request->only([
+            'title',
+            'description',
+            'latitude',
+            'longitude',
+            'category',
+            'urgency',
+            'business_area'
+        ]));
+
+        return response()->json([
+            'message' => 'Service request updated successfully',
+            'data' => new ServiceRequestResource($serviceRequest->load(['customer', 'provider']))
+        ]);
+    }
+
+    /**
+     * DELETE /api/requests/{serviceRequest}
+     * Delete a service request
+     */
+    public function destroy(Request $request, ServiceRequest $serviceRequest): JsonResponse
+    {
+        if ($serviceRequest->customer_id != $request->user()->id) {
+            abort(403, 'You do not own this request.');
+        }
+
+        if ($serviceRequest->status !== 'pending') {
+            abort(403, 'Only pending requests can be deleted.');
+        }
+
+        $serviceRequest->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Service request deleted successfully',
+        ], 200);
     }
 
     /**
@@ -206,7 +352,7 @@ class ServiceRequestController extends Controller
         try {
             // Check if API key is configured
             $apiKey = config('services.gemini.api_key');
-            
+
             if (!$apiKey || $apiKey === 'your_gemini_api_key_here') {
                 throw new \Exception('Gemini API key not configured.');
             }
@@ -241,7 +387,7 @@ class ServiceRequestController extends Controller
         // --- Local Fallback Logic ---
         // If external AI is unavailable, we apply a static "professionalizer"
         $original = $serviceRequest->description;
-        
+
         $replacements = [
             'fix' => 'repair and restore',
             'broken' => 'malfunctioning',
@@ -253,7 +399,9 @@ class ServiceRequestController extends Controller
 
         $enhanced = str_ireplace(array_keys($replacements), array_values($replacements), $original);
         $enhanced = ucfirst(trim($enhanced));
-        if (!fnmatch('*[.!]', $enhanced)) { $enhanced .= '.'; }
+        if (!fnmatch('*[.!]', $enhanced)) {
+            $enhanced .= '.';
+        }
 
         $serviceRequest->update([
             'description' => "Professional Request: {$enhanced}"

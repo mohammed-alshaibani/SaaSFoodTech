@@ -11,6 +11,7 @@ use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\ProviderController;
+use App\Http\Controllers\ProviderUserController;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
 use App\Http\Requests\StoreServiceRequestRequest;
@@ -43,14 +44,21 @@ Route::middleware('api-security')->group(function () {
         // Index & show: role scoping is handled in controller + Policy
         Route::get('/requests', [ServiceRequestController::class, 'index']);
         Route::get('/requests/{serviceRequest}', [ServiceRequestController::class, 'show']);
+        Route::put('/requests/{serviceRequest}', [ServiceRequestController::class, 'update']);
+        Route::delete('/requests/{serviceRequest}', [ServiceRequestController::class, 'destroy']);
 
         // Create: customers only + subscription limit gate
         Route::post('/requests', [ServiceRequestController::class, 'store'])
             ->middleware('check.limit');
 
-        // Provider actions: enforced by Policy
+        // Provider actions: enforced by Policy/Controller
         Route::patch('/requests/{serviceRequest}/accept', [ServiceRequestController::class, 'accept']);
+        Route::patch('/requests/{serviceRequest}/work-done', [ServiceRequestController::class, 'workDone']);
+        Route::patch('/requests/{serviceRequest}/drop', [ServiceRequestController::class, 'drop']);
+
+        // Customer actions: enforced by Controller
         Route::patch('/requests/{serviceRequest}/complete', [ServiceRequestController::class, 'complete']);
+        Route::patch('/requests/{serviceRequest}/cancel', [ServiceRequestController::class, 'cancel']);
 
         // throttle:10,1 = max 10 requests per 1 minute per user (per Architecture spec)
         Route::post('/ai/enhance', [AIController::class, 'enhance'])
@@ -163,22 +171,22 @@ Route::middleware('api-security')->group(function () {
             // Plans management
             Route::get('/plans', [AdminController::class, 'plans']);
             Route::post('/plans', [AdminController::class, 'createPlan']);
-            Route::patch('/plans/{plan}', [AdminController::class, 'updatePlanDetails']);
+            Route::match(['PUT', 'PATCH'], '/plans/{plan}', [AdminController::class, 'updatePlanDetails']);
             Route::delete('/plans/{plan}', [AdminController::class, 'deletePlan']);
 
             // Roles management
             Route::get('/roles', [RoleController::class, 'index']);
             Route::post('/roles', [RoleController::class, 'store']);
-            Route::put('/roles/{id}', [RoleController::class, 'update']);
-            Route::delete('/roles/{id}', [RoleController::class, 'destroy']);
+            Route::put('/roles/{role}', [RoleController::class, 'update']);
+            Route::delete('/roles/{role}', [RoleController::class, 'destroy']);
 
-            // Available permissions list (for frontend dropdown)
-            Route::get('/permissions', [AdminController::class, 'permissions']);
+            // Permissions management
+            Route::get('/permissions', [PermissionController::class, 'index']);
             Route::post('/permissions', [PermissionController::class, 'store'])
                 ->middleware('check.permission:permission.create');
-            Route::put('/permissions/{id}', [PermissionController::class, 'update'])
+            Route::put('/permissions/{permission}', [PermissionController::class, 'update'])
                 ->middleware('check.permission:permission.update');
-            Route::delete('/permissions/{id}', [PermissionController::class, 'destroy'])
+            Route::delete('/permissions/{permission}', [PermissionController::class, 'destroy'])
                 ->middleware('check.permission:permission.delete');
             Route::get('/stats', [AdminController::class, 'stats']);
         });
@@ -193,7 +201,12 @@ Route::middleware('api-security')->group(function () {
             Route::put('/subscriptions/{subscription}', [ProviderController::class, 'update']);
             Route::patch('/subscriptions/{subscription}', [ProviderController::class, 'update']);
             Route::delete('/subscriptions/{subscription}', [ProviderController::class, 'destroy']);
+
+            // Team User Management
+            Route::get('/users', [ProviderUserController::class, 'index']);
+            Route::post('/users', [ProviderUserController::class, 'store']);
+            Route::put('/users/{user}', [ProviderUserController::class, 'update']);
+            Route::delete('/users/{user}', [ProviderUserController::class, 'destroy']);
         });
     });
-
 });

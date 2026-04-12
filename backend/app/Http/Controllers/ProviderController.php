@@ -19,7 +19,7 @@ class ProviderController extends Controller
     {
         try {
             $provider = $request->user();
-            
+
             // Get all subscriptions (simplified - in production, filter by provider's customers)
             $subscriptions = UserSubscription::with(['user', 'subscriptionPlan'])
                 ->latest()
@@ -31,11 +31,11 @@ class ProviderController extends Controller
                         'customer_email' => $sub->user->email ?? '',
                         'customer_id' => $sub->user_id,
                         'plan_id' => $sub->subscription_plan_id,
-                        'plan_name' => $sub->subscriptionPlan->name ?? 'Unknown',
+                        'plan_name' => $sub->subscriptionPlan?->name ?? 'Unknown',
                         'status' => $sub->status,
                         'starts_at' => $sub->starts_at,
                         'ends_at' => $sub->ends_at,
-                        'amount' => $sub->subscriptionPlan->price ?? 0,
+                        'amount' => $sub->subscriptionPlan?->price ?? 0,
                     ];
                 });
 
@@ -59,18 +59,18 @@ class ProviderController extends Controller
     {
         try {
             $provider = $request->user();
-            
+
             // Get all subscriptions (simplified - in production, filter by provider's customers)
             $subscriptions = UserSubscription::with('subscriptionPlan')->get();
-            
+
             $activeSubscriptions = $subscriptions->where('status', 'active')->count();
             $pendingSubscriptions = $subscriptions->where('status', 'pending')->count();
-            
+
             // Calculate monthly revenue from subscription plans
             $monthlyRevenue = $subscriptions
                 ->where('status', 'active')
                 ->sum(function ($sub) {
-                    return $sub->subscriptionPlan->price ?? 0;
+                    return $sub->subscriptionPlan?->price ?? 0;
                 });
 
             return response()->json([
@@ -136,8 +136,10 @@ class ProviderController extends Controller
             ]);
 
             $updateData = [];
-            if (isset($validated['status'])) $updateData['status'] = $validated['status'];
-            if (isset($validated['plan_id'])) $updateData['subscription_plan_id'] = $validated['plan_id'];
+            if (isset($validated['status']))
+                $updateData['status'] = $validated['status'];
+            if (isset($validated['plan_id']))
+                $updateData['subscription_plan_id'] = $validated['plan_id'];
 
             if (!empty($updateData)) {
                 $subscription->update($updateData);

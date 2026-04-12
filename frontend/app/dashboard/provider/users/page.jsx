@@ -31,7 +31,7 @@ export default function ProviderUsersPage() {
     const { user } = useAuth();
     const { t, language } = useI18n();
     const isRTL = language === 'ar';
-    
+
     const [users, setUsers] = useState([]);
     const [filteredUsers, setFilteredUsers] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
@@ -40,7 +40,7 @@ export default function ProviderUsersPage() {
     const [message, setMessage] = useState(null);
     const [showModal, setShowModal] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
-    const [formData, setFormData] = useState({ name: '', email: '', role: 'customer', status: 'active' });
+    const [formData, setFormData] = useState({ name: '', email: '', role: 'provider_employee', status: 'active', permissions: [] });
 
     const fetchUsers = useCallback(async () => {
         try {
@@ -68,7 +68,7 @@ export default function ProviderUsersPage() {
             }
             setShowModal(false);
             setEditingUser(null);
-            setFormData({ name: '', email: '', role: 'customer', status: 'active' });
+            setFormData({ name: '', email: '', role: 'provider_employee', status: 'active', permissions: [] });
             fetchUsers();
         } catch (err) {
             console.error('Failed to save user:', err);
@@ -78,7 +78,13 @@ export default function ProviderUsersPage() {
 
     const handleEdit = (user) => {
         setEditingUser(user);
-        setFormData({ name: user.name, email: user.email, role: user.role || 'customer', status: user.status || 'active' });
+        setFormData({
+            name: user.name,
+            email: user.email,
+            role: user.parsed_role || 'provider_employee',
+            status: user.status || 'active',
+            permissions: user.direct_permissions || []
+        });
         setShowModal(true);
     };
 
@@ -97,7 +103,7 @@ export default function ProviderUsersPage() {
     const closeModal = () => {
         setShowModal(false);
         setEditingUser(null);
-        setFormData({ name: '', email: '', role: 'customer', status: 'active' });
+        setFormData({ name: '', email: '', role: 'provider_employee', status: 'active', permissions: [] });
     };
 
     useEffect(() => {
@@ -106,20 +112,20 @@ export default function ProviderUsersPage() {
 
     useEffect(() => {
         let result = users;
-        
+
         if (searchQuery) {
             const query = searchQuery.toLowerCase();
-            result = result.filter(u => 
+            result = result.filter(u =>
                 u.name?.toLowerCase().includes(query) ||
                 u.email?.toLowerCase().includes(query) ||
                 u.company?.toLowerCase().includes(query)
             );
         }
-        
+
         if (filterStatus !== 'all') {
             result = result.filter(u => u.status === filterStatus);
         }
-        
+
         setFilteredUsers(result);
     }, [searchQuery, filterStatus, users]);
 
@@ -130,7 +136,7 @@ export default function ProviderUsersPage() {
             amber: 'bg-amber-50 border-amber-200 text-amber-600',
             purple: 'bg-purple-50 border-purple-200 text-purple-600',
         };
-        
+
         return (
             <div className={`p-6 rounded-2xl border ${colors[color]} backdrop-blur-sm`}>
                 <div className="flex items-center justify-between">
@@ -154,7 +160,7 @@ export default function ProviderUsersPage() {
             pending: { color: 'bg-amber-100 text-amber-700 border-amber-200', label: t('users.pending') || 'Pending' },
         };
         const configItem = config[status] || config.active;
-        
+
         return (
             <span className={`px-3 py-1 rounded-full text-xs font-bold border ${configItem.color}`}>
                 {configItem.label}
@@ -168,7 +174,7 @@ export default function ProviderUsersPage() {
             provider: 'bg-blue-100 text-blue-700 border-blue-200',
             customer: 'bg-emerald-100 text-emerald-700 border-emerald-200',
         };
-        
+
         return (
             <span className={`px-3 py-1 rounded-full text-xs font-bold border ${colors[role] || colors.customer}`}>
                 {role || 'customer'}
@@ -207,33 +213,33 @@ export default function ProviderUsersPage() {
 
                 {/* Stats Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <StatCard 
-                        icon={Users} 
-                        title={t('users.total') || 'Total Users'} 
-                        value={users.length} 
-                        color="blue" 
+                    <StatCard
+                        icon={Users}
+                        title={t('users.total') || 'Total Users'}
+                        value={users.length}
+                        color="blue"
                     />
-                    <StatCard 
-                        icon={CheckCircle2} 
-                        title={t('users.active') || 'Active'} 
-                        value={users.filter(u => u.status === 'active').length} 
-                        color="emerald" 
+                    <StatCard
+                        icon={CheckCircle2}
+                        title={t('users.active') || 'Active'}
+                        value={users.filter(u => u.status === 'active').length}
+                        color="emerald"
                     />
-                    <StatCard 
-                        icon={Crown} 
-                        title={t('users.premium') || 'Premium'} 
-                        value={users.filter(u => u.plan === 'premium' || u.plan === 'enterprise').length} 
-                        color="amber" 
+                    <StatCard
+                        icon={Crown}
+                        title={t('users.premium') || 'Premium'}
+                        value={users.filter(u => u.plan === 'premium' || u.plan === 'enterprise').length}
+                        color="amber"
                     />
-                    <StatCard 
-                        icon={Shield} 
-                        title={t('users.newThisMonth') || 'New This Month'} 
+                    <StatCard
+                        icon={Shield}
+                        title={t('users.newThisMonth') || 'New This Month'}
                         value={users.filter(u => {
                             const created = new Date(u.created_at);
                             const now = new Date();
                             return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
-                        }).length} 
-                        color="purple" 
+                        }).length}
+                        color="purple"
                     />
                 </div>
 
@@ -325,7 +331,7 @@ export default function ProviderUsersPage() {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">
-                                                <RoleBadge role={u.role || 'customer'} />
+                                                <RoleBadge role={u.parsed_role || 'provider_employee'} />
                                             </td>
                                             <td className="px-6 py-4">
                                                 <StatusBadge status={u.status || 'active'} />
@@ -396,10 +402,39 @@ export default function ProviderUsersPage() {
                                         onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                                         className="w-full bg-white border border-gray-200 rounded-2xl px-6 py-4 text-sm font-bold text-gray-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
                                     >
-                                        <option value="customer">{t('users.customer') || 'Customer'}</option>
+                                        <option value="provider_employee">{t('users.providerEmployee') || 'Provider Employee'}</option>
                                         <option value="provider_admin">{t('users.providerAdmin') || 'Provider Admin'}</option>
                                     </select>
                                 </div>
+                                {formData.role === 'provider_employee' && (
+                                    <div>
+                                        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Granular Permissions</label>
+                                        <div className="grid grid-cols-2 gap-3 mt-1 bg-gray-50 p-4 border border-gray-100 rounded-xl">
+                                            {[
+                                                { id: 'request.view_all', label: 'View All Requests' },
+                                                { id: 'request.accept', label: 'Accept Requests' },
+                                                { id: 'request.complete', label: 'Complete Requests' },
+                                                { id: 'request.view_nearby', label: 'Discover Nearby' },
+                                            ].map(perm => (
+                                                <label key={perm.id} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={formData.permissions.includes(perm.id)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setFormData({ ...formData, permissions: [...formData.permissions, perm.id] });
+                                                            } else {
+                                                                setFormData({ ...formData, permissions: formData.permissions.filter(p => p !== perm.id) });
+                                                            }
+                                                        }}
+                                                        className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4"
+                                                    />
+                                                    <span className="font-medium">{perm.label}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                                 <div>
                                     <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">{t('users.status') || 'Status'}</label>
                                     <select

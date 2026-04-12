@@ -9,6 +9,8 @@ class Role extends SpatieRole
 {
     use HasFactory;
 
+    protected $guard_name = 'sanctum';
+
     protected $fillable = [
         'name',
         'guard_name',

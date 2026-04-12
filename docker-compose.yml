@@ -25,7 +25,7 @@ services:
       - DB_CONNECTION=mysql
       - DB_HOST=mysql
       - DB_PORT=3306
-      - DB_DATABASE=otex_platform
+      - DB_DATABASE=saas_foodtech
       - DB_USERNAME=root
       - DB_PASSWORD=
       - BROADCAST_CONNECTION=reverb
@@ -82,7 +82,7 @@ services:
       - DB_CONNECTION=mysql
       - DB_HOST=mysql
       - DB_PORT=3306
-      - DB_DATABASE=otex_platform
+      - DB_DATABASE=saas_foodtech
       - DB_USERNAME=root
       - DB_PASSWORD=
       - BROADCAST_CONNECTION=reverb
@@ -118,7 +118,7 @@ services:
     ports:
       - "3307:3306"
     environment:
-      - MYSQL_DATABASE=otex_platform
+      - MYSQL_DATABASE=saas_foodtech
       - MYSQL_ALLOW_EMPTY_PASSWORD=yes
       - MYSQL_ROOT_PASSWORD=
     volumes:

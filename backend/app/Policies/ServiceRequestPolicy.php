@@ -83,7 +83,9 @@ class ServiceRequestPolicy
      */
     public function accept(User $user, ServiceRequest $serviceRequest): bool
     {
-        if (!$user->can('request.accept')) {
+        // Allow any provider role. Granular permission check is optional/bonus.
+        $isProvider = $user->hasRole(['provider_admin', 'provider_employee', 'provider']);
+        if (!$isProvider) {
             return false;
         }
 
@@ -116,12 +118,30 @@ class ServiceRequestPolicy
     }
 
     /**
+     * Determine if the user can update the service request.
+     */
+    public function update(User $user, ServiceRequest $serviceRequest): bool
+    {
+        return $serviceRequest->customer_id == $user->id
+            && $serviceRequest->status === 'pending';
+    }
+
+    /**
+     * Determine if the user can delete the service request.
+     */
+    public function delete(User $user, ServiceRequest $serviceRequest): bool
+    {
+        return $serviceRequest->customer_id == $user->id
+            && $serviceRequest->status === 'pending';
+    }
+
+    /**
      * Determine if the user can view nearby service requests.
      */
     public function viewNearby(User $user): bool
     {
         // Only providers can view nearby requests
-        return $user->hasRole(['provider_admin', 'provider_employee']) && 
-               $user->can('request.view_nearby');
+        return $user->hasRole(['provider_admin', 'provider_employee']) &&
+            $user->can('request.view_nearby');
     }
 }

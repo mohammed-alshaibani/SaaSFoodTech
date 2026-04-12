@@ -31,8 +31,12 @@ export default function Sidebar() {
 
     // Role-based navigation items
     const getNavItems = () => {
-        const role = user?.roles?.[0] || user?.role || 'customer';
-        
+        let role = 'customer';
+        if (user?.roles?.[0]?.name) role = user.roles[0].name;
+        else if (typeof user?.roles?.[0] === 'string') role = user.roles[0];
+        else if (user?.parsed_role) role = user.parsed_role;
+        else if (user?.role) role = user.role;
+
         // Admin navigation
         if (role === 'admin') {
             return [
@@ -44,16 +48,16 @@ export default function Sidebar() {
                 { href: '/dashboard/admin/requests', icon: FileText, label: t('sidebar.requests') || 'طلبات الخدمة', exact: true },
             ];
         }
-        
+
         // Provider navigation
-        if (role === 'provider' || role === 'provider_admin') {
+        if (role === 'provider' || role === 'provider_admin' || role === 'provider_employee') {
             return [
                 { href: '/dashboard/provider', icon: LayoutDashboard, label: t('sidebar.dashboard') || 'لوحة التحكم', exact: true },
                 { href: '/dashboard/provider/subscriptions', icon: ShoppingBag, label: t('sidebar.mySubscriptions') || 'اشتراكاتي', exact: true },
                 { href: '/dashboard/provider/requests', icon: ClipboardList, label: t('sidebar.myServiceRequests') || 'طلبات خدماتي', exact: true },
             ];
         }
-        
+
         // Customer navigation (default)
         return [
             { href: '/dashboard/customer', icon: LayoutDashboard, label: t('sidebar.dashboard') || 'لوحة التحكم', exact: true },
@@ -61,7 +65,7 @@ export default function Sidebar() {
             { href: '/dashboard/customer/requests', icon: ClipboardList, label: t('sidebar.myRequests') || 'طلباتي', exact: true },
         ];
     };
-    
+
     const navItems = getNavItems();
 
     return (
@@ -107,7 +111,7 @@ export default function Sidebar() {
                             {navItems.map((item) => {
                                 const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
                                 const Icon = item.icon;
-                                
+
                                 return (
                                     <Link key={item.href} href={item.href} onClick={() => setIsOpen(false)}
                                         className={`flex items-center gap-3 px-6 py-3 text-sm transition-all ${isActive ? activeText : inactiveText}`}>

@@ -11,11 +11,15 @@ import { CreditCard, Check, Star, Zap, Building2, Loader2 } from 'lucide-react';
 export default function PlansPage() {
     const { user, refreshUser } = useAuth();
     const { t, isRTL } = useI18n();
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [plansLoading, setPlansLoading] = useState(true);
     const [message, setMessage] = useState(null);
     const [currentPlan, setCurrentPlan] = useState(user?.plan || 'free');
     const [plans, setPlans] = useState([]);
+
+    // Mock Payment Modal State
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [selectedPlanForPayment, setSelectedPlanForPayment] = useState(null);
 
     useEffect(() => {
         setCurrentPlan(user?.plan || 'free');
@@ -38,22 +42,31 @@ export default function PlansPage() {
 
     const handleUpgrade = async (planId) => {
         if (planId === currentPlan) return;
+        setSelectedPlanForPayment(planId);
+        setShowPaymentModal(true);
+    };
 
+    const processMockPayment = async (e) => {
+        e.preventDefault();
         setLoading(true);
         setMessage(null);
 
         try {
             const res = await api.post('/subscription/upgrade', {
-                plan: planId,
-                payment_method: 'credit_card', // Default payment method (required by backend)
+                plan: selectedPlanForPayment,
+                payment_method: 'card',
             });
+
             setMessage({ type: 'success', text: res.data.message || t('plans.upgradeSuccess') });
             await refreshUser();
+            setShowPaymentModal(false);
         } catch (err) {
             const errorMsg = err.response?.data?.message || err.response?.data?.error || t('plans.upgradeError');
             setMessage({ type: 'error', text: errorMsg });
+            setShowPaymentModal(false);
         } finally {
             setLoading(false);
+            setSelectedPlanForPayment(null);
         }
     };
 
@@ -97,11 +110,10 @@ export default function PlansPage() {
                 {/* Message */}
                 {message && (
                     <div
-                        className={`p-4 rounded-2xl text-sm font-bold ${
-                            message.type === 'success'
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                : 'bg-red-50 text-red-700 border border-red-200'
-                        }`}
+                        className={`p-4 rounded-2xl text-sm font-bold ${message.type === 'success'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-red-50 text-red-700 border border-red-200'
+                            }`}
                     >
                         {message.text}
                     </div>
@@ -132,89 +144,86 @@ export default function PlansPage() {
                             return (
                                 <div
                                     key={plan.id}
-                                    className={`relative bg-white rounded-3xl border-2 p-8 transition-all duration-300 ${colorClasses} ${
-                                        plan.popular && !isCurrent ? 'shadow-xl shadow-[#7C3AED]/10 scale-105' : ''
-                                    } ${isCurrent ? '' : 'hover:shadow-lg'}`}
+                                    className={`relative bg-white rounded-3xl border-2 p-8 transition-all duration-300 ${colorClasses} ${plan.popular && !isCurrent ? 'shadow-xl shadow-[#7C3AED]/10 scale-105' : ''
+                                        } ${isCurrent ? '' : 'hover:shadow-lg'}`}
                                 >
-                                {/* Popular Badge */}
-                                {plan.popular && !isCurrent && (
-                                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-[#7C3AED] text-white text-xs font-black rounded-full">
-                                        {isRTL ? 'الأكثر شيوعاً' : 'Most Popular'}
-                                    </div>
-                                )}
+                                    {/* Popular Badge */}
+                                    {plan.popular && !isCurrent && (
+                                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-[#7C3AED] text-white text-xs font-black rounded-full">
+                                            {isRTL ? 'الأكثر شيوعاً' : 'Most Popular'}
+                                        </div>
+                                    )}
 
-                                {/* Current Badge */}
-                                {isCurrent && (
-                                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-gray-600 text-white text-xs font-black rounded-full">
-                                        {isRTL ? 'الخطة الحالية' : 'Current Plan'}
-                                    </div>
-                                )}
+                                    {/* Current Badge */}
+                                    {isCurrent && (
+                                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-gray-600 text-white text-xs font-black rounded-full">
+                                            {isRTL ? 'الخطة الحالية' : 'Current Plan'}
+                                        </div>
+                                    )}
 
-                                {/* Icon */}
-                                <div
-                                    className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 ${
-                                        color === 'purple'
+                                    {/* Icon */}
+                                    <div
+                                        className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 ${color === 'purple'
                                             ? 'bg-[#7C3AED]/10 text-[#7C3AED]'
                                             : color === 'blue'
-                                            ? 'bg-blue-100 text-blue-600'
-                                            : 'bg-gray-100 text-gray-600'
-                                    }`}
-                                >
-                                    <Icon size={28} />
-                                </div>
+                                                ? 'bg-blue-100 text-blue-600'
+                                                : 'bg-gray-100 text-gray-600'
+                                            }`}
+                                    >
+                                        <Icon size={28} />
+                                    </div>
 
-                                {/* Plan Name */}
-                                <h3 className="text-xl font-black text-[#1E293B] mb-2">
-                                    {isRTL ? plan.display_name : plan.name}
-                                </h3>
+                                    {/* Plan Name */}
+                                    <h3 className="text-xl font-black text-[#1E293B] mb-2">
+                                        {isRTL ? plan.display_name : plan.name}
+                                    </h3>
 
-                                {/* Price */}
-                                <div className="mb-6">
-                                    <span className="text-4xl font-black text-[#1E293B]">
-                                        {planPrice}
-                                    </span>
-                                    <span className="text-gray-500 text-sm font-medium">
-                                        {' '}
-                                        SAR/{isRTL ? (billingCycle === 'month' ? 'شهر' : 'سنة') : billingCycle}
-                                    </span>
-                                </div>
+                                    {/* Price */}
+                                    <div className="mb-6">
+                                        <span className="text-4xl font-black text-[#1E293B]">
+                                            {planPrice}
+                                        </span>
+                                        <span className="text-gray-500 text-sm font-medium">
+                                            {' '}
+                                            SAR/{isRTL ? (billingCycle === 'month' ? 'شهر' : 'سنة') : billingCycle}
+                                        </span>
+                                    </div>
 
-                                {/* Features */}
-                                <ul className="space-y-3 mb-8">
-                                    {planFeatures.map((feature, idx) => (
-                                        <li key={idx} className="flex items-center gap-3 text-sm text-gray-600">
-                                            <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
-                                                <Check size={12} strokeWidth={3} />
-                                            </div>
-                                            {feature}
-                                        </li>
-                                    ))
-                                </ul>
+                                    {/* Features */}
+                                    <ul className="space-y-3 mb-8">
+                                        {planFeatures.map((feature, idx) => (
+                                            <li key={idx} className="flex items-center gap-3 text-sm text-gray-600">
+                                                <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                                                    <Check size={12} strokeWidth={3} />
+                                                </div>
+                                                {feature}
+                                            </li>
+                                        ))}
+                                    </ul>
 
-                                {/* Action Button */}
-                                <button
-                                    onClick={() => handleUpgrade(planId)}
-                                    disabled={isCurrent || loading}
-                                    className={`w-full py-4 rounded-2xl font-bold text-sm transition-all ${
-                                        isCurrent
+                                    {/* Action Button */}
+                                    <button
+                                        onClick={() => handleUpgrade(planId)}
+                                        disabled={isCurrent || loading}
+                                        className={`w-full py-4 rounded-2xl font-bold text-sm transition-all ${isCurrent
                                             ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                             : color === 'purple'
-                                            ? 'bg-[#7C3AED] text-white hover:bg-[#6D28D9] shadow-lg shadow-[#7C3AED]/25'
-                                            : color === 'blue'
-                                            ? 'bg-blue-500 text-white hover:bg-blue-600 shadow-lg shadow-blue-500/25'
-                                            : 'bg-gray-900 text-white hover:bg-gray-800'
-                                    }`}
-                                >
-                                    {loading ? (
-                                        <Loader2 className="animate-spin mx-auto" size={20} />
-                                    ) : isCurrent ? (
-                                        isRTL ? 'الخطة الحالية' : 'Current Plan'
-                                    ) : (
-                                        isRTL ? 'اختر الخطة' : 'Select Plan'
-                                    )}
-                                </button>
-                            </div>
-                        );
+                                                ? 'bg-[#7C3AED] text-white hover:bg-[#6D28D9] shadow-lg shadow-[#7C3AED]/25'
+                                                : color === 'blue'
+                                                    ? 'bg-blue-500 text-white hover:bg-blue-600 shadow-lg shadow-blue-500/25'
+                                                    : 'bg-gray-900 text-white hover:bg-gray-800'
+                                            }`}
+                                    >
+                                        {loading ? (
+                                            <Loader2 className="animate-spin mx-auto" size={20} />
+                                        ) : isCurrent ? (
+                                            isRTL ? 'الخطة الحالية' : 'Current Plan'
+                                        ) : (
+                                            isRTL ? 'اختر الخطة' : 'Select Plan'
+                                        )}
+                                    </button>
+                                </div>
+                            );
                         })
                     )}
                 </div>
@@ -249,6 +258,66 @@ export default function PlansPage() {
                         </div>
                     </div>
                 </div>
+                {/* Mock Payment Modal */}
+                {showPaymentModal && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+                        <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
+                            <div className="text-center mb-6">
+                                <div className="w-16 h-16 bg-[#7C3AED]/10 text-[#7C3AED] rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <CreditCard size={32} />
+                                </div>
+                                <h2 className="text-2xl font-black text-[#1E293B]">
+                                    {isRTL ? 'إتمام الدفع (تجريبي)' : 'Mock Payment Checkout'}
+                                </h2>
+                                <p className="text-gray-500 mt-2 text-sm">
+                                    {isRTL ? `للترقية إلى خطة ${selectedPlanForPayment}، يرجى ملء بيانات الدفع الوهمية أدناه.` : `To upgrade to the ${selectedPlanForPayment} plan, please fill in your mock payment details.`}
+                                </p>
+                            </div>
+
+                            <form onSubmit={processMockPayment} className="space-y-4">
+                                <div>
+                                    <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">{isRTL ? 'رقم البطاقة' : 'Card Number'}</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="•••• •••• •••• ••••"
+                                        defaultValue="4242 4242 4242 4242"
+                                        className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 font-mono text-center outline-none focus:border-[#7C3AED] focus:ring-1 focus:ring-[#7C3AED]"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">{isRTL ? 'تاريخ الانتهاء' : 'Expiry'}</label>
+                                        <input type="text" required placeholder="MM/YY" defaultValue="12/26" className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 font-mono text-center outline-none focus:border-[#7C3AED] focus:ring-1 focus:ring-[#7C3AED]" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">CVV</label>
+                                        <input type="text" required placeholder="123" defaultValue="123" className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 font-mono text-center outline-none focus:border-[#7C3AED] focus:ring-1 focus:ring-[#7C3AED]" />
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-3 pt-6">
+                                    <button
+                                        type="button"
+                                        disabled={loading}
+                                        onClick={() => setShowPaymentModal(false)}
+                                        className="flex-1 px-6 py-4 bg-gray-100 rounded-full text-sm font-bold text-gray-600 hover:bg-gray-200 transition"
+                                    >
+                                        {isRTL ? 'إلغاء' : 'Cancel'}
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={loading}
+                                        className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-gray-900 rounded-full text-sm font-bold text-white hover:bg-black transition"
+                                    >
+                                        {loading ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
+                                        {isRTL ? 'دفع وهمي (Mock Pay)' : 'Mock Pay & Approve'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
             </div>
         </DashboardLayout>
     );

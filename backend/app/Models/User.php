@@ -16,6 +16,8 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable, HasRoles;
 
+    protected $guard_name = 'sanctum';
+
     /**
      * The attributes that are mass assignable.
      *
@@ -123,21 +125,21 @@ class User extends Authenticatable
     public function hasExceededRequestLimit(): bool
     {
         $activeSubscription = $this->activeSubscription();
-        
+
         if (!$activeSubscription) {
             // Fallback to legacy plan logic
-            return $this->plan !== 'free' ? false : 
-                   $this->serviceRequests()->whereMonth('created_at', now()->month)->count() >= 3;
+            return $this->plan !== 'free' ? false :
+                $this->serviceRequests()->whereMonth('created_at', now()->month)->count() >= 3;
         }
 
         $limit = $activeSubscription->getPlanLimit('requests_per_month', 'unlimited');
-        
+
         if ($limit === 'unlimited') {
             return false;
         }
 
         $currentCount = $this->serviceRequests()
-            ->whereMonth('created_at', now()->month)
+            ->whereIn('status', ['pending', 'accepted'])
             ->count();
 
         return $currentCount >= $limit;
@@ -149,12 +151,12 @@ class User extends Authenticatable
     public function getCurrentMonthUsage(): array
     {
         $activeSubscription = $this->activeSubscription();
-        
+
         if (!$activeSubscription) {
             // Fallback to legacy plan logic
             $limit = $this->plan === 'free' ? 3 : 'unlimited';
-            $used = $this->serviceRequests()->whereMonth('created_at', now()->month)->count();
-            
+            $used = $this->serviceRequests()->whereIn('status', ['pending', 'accepted'])->count();
+
             return [
                 'used' => $used,
                 'limit' => $limit,
@@ -164,7 +166,7 @@ class User extends Authenticatable
         }
 
         $limit = $activeSubscription->getPlanLimit('requests_per_month', 'unlimited');
-        $used = $this->serviceRequests()->whereMonth('created_at', now()->month)->count();
+        $used = $this->serviceRequests()->whereIn('status', ['pending', 'accepted'])->count();
 
         return [
             'used' => $used,
@@ -180,10 +182,10 @@ class User extends Authenticatable
     public function hasFeatureAccess(string $feature): bool
     {
         $activeSubscription = $this->activeSubscription();
-        
+
         if (!$activeSubscription) {
             // Fallback to legacy plan logic
-            return match($feature) {
+            return match ($feature) {
                 'ai_enhancement' => in_array($this->plan, ['premium', 'enterprise']),
                 'priority_support' => in_array($this->plan, ['premium', 'enterprise']),
                 'api_access' => $this->plan === 'enterprise',

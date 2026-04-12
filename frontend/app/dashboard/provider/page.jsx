@@ -207,19 +207,33 @@ export default function ProviderDashboard() {
                     </div>
 
                     {tab === 'nearby' && (
-                        <div className="flex items-center gap-4 bg-[#7C3AED]/10 border border-[#7C3AED]/20 px-6 py-3 rounded-xl animate-in slide-in-from-left-4">
-                            <span className="text-[10px] font-bold text-[#7C3AED] uppercase tracking-wider">{t('dashboard.radius')}</span>
-                            <select
-                                value={radius}
-                                onChange={e => setRadius(parseInt(e.target.value))}
-                                className="bg-transparent border-none text-[#1A202C] text-sm font-bold outline-none cursor-pointer"
-                            >
-                                {[5, 10, 20, 50, 100].map(r => <option key={r} value={r}>{r} KM</option>)}
-                            </select>
-                            <div className="w-px h-6 bg-[#7C3AED]/20" />
-                            <button onClick={requestGeo} className="flex items-center gap-2 text-[10px] font-bold text-[#7C3AED] uppercase tracking-wider hover:text-[#1A202C] transition">
-                                <Navigation size={14} /> Update
-                            </button>
+                        <div className="flex flex-col gap-2">
+                            <div className="flex items-center gap-4 bg-[#7C3AED]/10 border border-[#7C3AED]/20 px-6 py-3 rounded-xl animate-in slide-in-from-left-4">
+                                <span className="text-[10px] font-bold text-[#7C3AED] uppercase tracking-wider">{t('dashboard.radius')}</span>
+                                <select
+                                    value={radius}
+                                    onChange={e => setRadius(parseInt(e.target.value))}
+                                    className="bg-transparent border-none text-[#1A202C] text-sm font-bold outline-none cursor-pointer"
+                                >
+                                    {[5, 10, 20, 50, 100].map(r => <option key={r} value={r}>{r} KM</option>)}
+                                </select>
+                                <div className="w-px h-6 bg-[#7C3AED]/20" />
+                                <button onClick={requestGeo} className="flex items-center gap-2 text-[10px] font-bold text-[#7C3AED] uppercase tracking-wider hover:text-[#1A202C] transition">
+                                    <Navigation size={14} /> Update
+                                </button>
+                            </div>
+                            {/* Location status */}
+                            <div className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[10px] font-bold border ${coords && !geoError ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    : geoError ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                        : 'bg-gray-50 text-gray-500 border-gray-200'
+                                }`}>
+                                <MapPin size={11} />
+                                {coords && !geoError
+                                    ? `GPS: ${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)} — ${radius} km radius`
+                                    : geoError
+                                        ? `${geoError} — ${coords ? `${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}` : 'No coords'}`
+                                        : 'Detecting location...'}
+                            </div>
                         </div>
                     )}
                 </div>

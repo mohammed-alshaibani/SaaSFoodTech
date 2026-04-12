@@ -37,7 +37,7 @@ export default function DynamicCRUD({ config }) {
         setLoading(true);
         try {
             console.log(`Fetching data from ${endpoint}?per_page=100`);
-            const res = await api.get(`${endpoint}?per_page=100`);
+            const res = await api.get(`${endpoint}?per_page=100&_t=${Date.now()}`);
             const loadedData = res.data.data || res.data || [];
             console.log(`Loaded ${loadedData.length} items from ${endpoint}`);
             setData(Array.isArray(loadedData) ? loadedData : []);
@@ -64,11 +64,16 @@ export default function DynamicCRUD({ config }) {
         e.preventDefault();
         try {
             console.log(`Submitting form for ${title}:`, { editingItem: editingItem?.id, formData });
-            
+
             // Remove guard_name from formData since it's handled by backend
             const submitData = { ...formData };
             delete submitData.guard_name;
-            
+
+            // Remove empty password so it's not sent and doesn't trigger length validation
+            if (submitData.password === '') {
+                delete submitData.password;
+            }
+
             if (editingItem) {
                 const response = await api.put(`${endpoint}/${editingItem.id}`, submitData);
                 console.log('Update response:', response);
@@ -88,7 +93,7 @@ export default function DynamicCRUD({ config }) {
             console.error(`Failed to save ${title}:`, err);
             console.error('Error response:', err.response?.data);
             const errorMsg = err.response?.data?.message || err.response?.data?.error || t('common.saveFailed') || 'Failed to save';
-            
+
             // Show validation errors if present
             if (err.response?.data?.errors) {
                 const errorDetails = Object.entries(err.response.data.errors)
@@ -139,14 +144,14 @@ export default function DynamicCRUD({ config }) {
             console.error(`Failed to delete ${title}:`, err);
             console.error('Error response data:', err.response?.data);
             let errorMsg = t('common.deleteFailed') || 'فشل الحذف';
-            
+
             // Display detailed error message from API
             if (err.response?.data?.message) {
                 errorMsg = err.response.data.message;
             } else if (err.response?.data?.error) {
                 errorMsg = err.response.data.error;
             }
-            
+
             showMessage(errorMsg, 'error');
         }
     };
@@ -279,7 +284,7 @@ export default function DynamicCRUD({ config }) {
                                 {fields.filter(f => f.form).map(f => (
                                     <div key={f.name}>
                                         <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">{f.label}</label>
-                                        
+
                                         {f.renderForm ? f.renderForm(formData[f.name], (val) => setFormData({ ...formData, [f.name]: val }), formData) : f.type === 'select' ? (
                                             <select
                                                 value={formData[f.name]}
@@ -313,7 +318,7 @@ export default function DynamicCRUD({ config }) {
                                     </div>
                                 ))}
                             </div>
-                            
+
                             <div className="flex gap-3 pt-6 border-t border-gray-100">
                                 <button type="button" onClick={closeModal} className="flex-1 px-6 py-4 bg-gray-100 rounded-2xl text-sm font-bold text-gray-500 hover:bg-gray-200 transition">
                                     {t('common.cancel') || 'Cancel'}

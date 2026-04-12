@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import api from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
@@ -21,7 +21,10 @@ import {
     ChevronRight,
     X,
     Edit2,
-    Trash2
+    Trash2,
+    Sparkles,
+    Navigation,
+    LocateFixed
 } from 'lucide-react';
 
 const STATUS_BADGES = {
@@ -126,8 +129,28 @@ export default function RequestsPage() {
     const [statusFilter, setStatusFilter] = useState('all');
     const [showModal, setShowModal] = useState(false);
     const [editingRequest, setEditingRequest] = useState(null);
-    const [formData, setFormData] = useState({ title: '', description: '', latitude: '', longitude: '' });
+    const [formData, setFormData] = useState({ title: '', description: '', latitude: 24.7136, longitude: 46.6753 });
     const [message, setMessage] = useState(null);
+    const [isEnhancing, setIsEnhancing] = useState(false);
+    const [geoStatus, setGeoStatus] = useState('default'); // 'default' | 'detecting' | 'detected' | 'error'
+
+    const detectGPS = useCallback(() => {
+        if (!navigator.geolocation) {
+            setGeoStatus('error');
+            return;
+        }
+        setGeoStatus('detecting');
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                setFormData(prev => ({ ...prev, latitude: parseFloat(pos.coords.latitude.toFixed(6)), longitude: parseFloat(pos.coords.longitude.toFixed(6)) }));
+                setGeoStatus('detected');
+            },
+            () => {
+                setGeoStatus('error');
+            },
+            { timeout: 8000 }
+        );
+    }, []);
 
     const fetchRequests = useCallback(async () => {
         setLoading(true);
@@ -141,6 +164,25 @@ export default function RequestsPage() {
         }
     }, []);
 
+    const handleEnhance = async () => {
+        if (!formData.description || formData.description.length < 10) {
+            alert(isRTL ? 'يرجى إدخال 10 أحرف على الأقل' : 'Please enter at least 10 characters.');
+            return;
+        }
+        setIsEnhancing(true);
+        try {
+            const res = await api.post('/ai/enhance', { description: formData.description, type: 'service_request' });
+            if (res.data?.enhanced_description) {
+                setFormData({ ...formData, description: res.data.enhanced_description });
+            }
+        } catch (err) {
+            console.error('AI Enhancement failed', err);
+            setMessage({ type: 'error', text: isRTL ? 'فشل تحسين النص' : 'Failed to enhance description' });
+        } finally {
+            setIsEnhancing(false);
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
@@ -148,26 +190,39 @@ export default function RequestsPage() {
                 await api.put(`/requests/${editingRequest.id}`, formData);
                 setMessage({ type: 'success', text: t('requests.updateSuccess') || 'Request updated successfully' });
             } else {
-                await api.post('/requests', formData);
-                setMessage({ type: 'success', text: t('requests.createSuccess') || 'Request created successfully' });
+                const reqResult = await api.post('/requests', formData);
+                if (reqResult.data?.warnings?.length > 0) {
+                    setMessage({ type: 'success', text: (t('requests.createSuccess') || 'Request created.') + ' ' + reqResult.data.warnings[0] });
+                } else {
+                    setMessage({ type: 'success', text: t('requests.createSuccess') || 'Request created successfully' });
+                }
             }
             setShowModal(false);
             setEditingRequest(null);
-            setFormData({ title: '', description: '', latitude: '', longitude: '' });
+            setFormData({ title: '', description: '', latitude: 24.7136, longitude: 46.6753 });
             fetchRequests();
         } catch (err) {
             console.error('Failed to save request:', err);
-            setMessage({ type: 'error', text: t('requests.saveFailed') || 'Failed to save request' });
+            // Check for subscription limit 403 error gracefully
+            if (err.response?.status === 403 && err.response?.data?.message?.toLowerCase().includes('limit')) {
+                setMessage({
+                    type: 'error',
+                    text: isRTL ? 'لقد وصلت للحد الأقصى للطلبات. يرجى الترقية إلى برو (Pro).' : 'You have reached your limit. Please upgrade to Pro.',
+                    requiresUpgrade: true
+                });
+            } else {
+                setMessage({ type: 'error', text: err.response?.data?.message || t('requests.saveFailed') || 'Failed to save request' });
+            }
         }
     };
 
     const handleEdit = (request) => {
         setEditingRequest(request);
-        setFormData({ 
-            title: request.title, 
-            description: request.description, 
-            latitude: request.latitude || '', 
-            longitude: request.longitude || '' 
+        setFormData({
+            title: request.title,
+            description: request.description,
+            latitude: request.latitude || '',
+            longitude: request.longitude || ''
         });
         setShowModal(true);
     };
@@ -187,7 +242,27 @@ export default function RequestsPage() {
     const closeModal = () => {
         setShowModal(false);
         setEditingRequest(null);
-        setFormData({ title: '', description: '', latitude: '', longitude: '' });
+        setFormData({ title: '', description: '', latitude: 24.7136, longitude: 46.6753 });
+        setGeoStatus('default');
+    };
+
+    const openNewModal = () => {
+        setEditingRequest(null);
+        setFormData({ title: '', description: '', latitude: 24.7136, longitude: 46.6753 });
+        setGeoStatus('default');
+        setShowModal(true);
+        // Auto-detect on open
+        if (navigator.geolocation) {
+            setGeoStatus('detecting');
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    setFormData(prev => ({ ...prev, latitude: parseFloat(pos.coords.latitude.toFixed(6)), longitude: parseFloat(pos.coords.longitude.toFixed(6)) }));
+                    setGeoStatus('detected');
+                },
+                () => setGeoStatus('default'),
+                { timeout: 6000 }
+            );
+        }
     };
 
     useEffect(() => {
@@ -224,7 +299,7 @@ export default function RequestsPage() {
                         </p>
                     </div>
                     <button
-                        onClick={() => setShowModal(true)}
+                        onClick={openNewModal}
                         className="flex items-center gap-2 px-6 py-3 bg-[#7C3AED] text-white font-bold rounded-2xl hover:bg-[#6D28D9] transition-all shadow-lg shadow-[#7C3AED]/25"
                     >
                         <Plus size={20} />
@@ -264,18 +339,16 @@ export default function RequestsPage() {
                 <div className="flex flex-col md:flex-row gap-4">
                     <div className={`flex-1 relative ${isRTL ? 'rtl' : ''}`}>
                         <Search
-                            className={`absolute top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 ${
-                                isRTL ? 'right-4 left-auto' : 'left-4'
-                            }`}
+                            className={`absolute top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 ${isRTL ? 'right-4 left-auto' : 'left-4'
+                                }`}
                         />
                         <input
                             type="text"
                             placeholder={isRTL ? 'البحث في الطلبات...' : 'Search requests...'}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className={`w-full bg-white border border-gray-200 rounded-2xl py-4 text-sm font-bold text-[#1E293B] outline-none hover:border-gray-300 focus:border-[#7C3AED] focus:ring-1 focus:ring-[#7C3AED] transition shadow-sm ${
-                                isRTL ? 'pr-12 pl-4' : 'pl-12 pr-4'
-                            }`}
+                            className={`w-full bg-white border border-gray-200 rounded-2xl py-4 text-sm font-bold text-[#1E293B] outline-none hover:border-gray-300 focus:border-[#7C3AED] focus:ring-1 focus:ring-[#7C3AED] transition shadow-sm ${isRTL ? 'pr-12 pl-4' : 'pl-12 pr-4'
+                                }`}
                         />
                     </div>
                     <select
@@ -312,13 +385,17 @@ export default function RequestsPage() {
                 {/* Message */}
                 {message && (
                     <div
-                        className={`p-4 rounded-2xl text-sm font-bold ${
-                            message.type === 'success'
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                : 'bg-red-50 text-red-700 border border-red-200'
-                        }`}
+                        className={`p-4 rounded-2xl text-sm font-bold flex items-center justify-between ${message.type === 'success'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-red-50 text-red-700 border border-red-200'
+                            }`}
                     >
-                        {message.text}
+                        <span>{message.text}</span>
+                        {message.requiresUpgrade && (
+                            <Link href="/dashboard/customer/plans" className="shrink-0 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition">
+                                {isRTL ? 'الترقية الآن' : 'Upgrade Now'}
+                            </Link>
+                        )}
                     </div>
                 )}
 
@@ -354,25 +431,70 @@ export default function RequestsPage() {
                                         rows={3}
                                         required
                                     />
+                                    <button
+                                        type="button"
+                                        onClick={handleEnhance}
+                                        disabled={isEnhancing}
+                                        className="mt-2 flex items-center justify-center gap-2 w-full px-4 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-xl text-xs font-bold text-blue-600 hover:from-blue-100 hover:to-indigo-100 transition-colors"
+                                    >
+                                        {isEnhancing ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                                        {isEnhancing ? (isRTL ? 'جاري التحسين...' : 'Enhancing...') : (isRTL ? 'تحسين باستخدام الذكاء الاصطناعي' : 'Enhance strictly w/ AI')}
+                                    </button>
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">{isRTL ? 'خط العرض' : 'Latitude'}</label>
-                                        <input
-                                            type="text"
-                                            value={formData.latitude}
-                                            onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
-                                            className="w-full bg-white border border-gray-200 rounded-2xl px-6 py-4 text-sm font-bold text-[#1E293B] outline-none focus:border-[#7C3AED] focus:ring-1 focus:ring-[#7C3AED] transition"
-                                        />
+                                {/* Geolocation */}
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                                            {isRTL ? 'الموقع الجغرافي' : 'Location'}
+                                        </label>
+                                        <button
+                                            type="button"
+                                            onClick={detectGPS}
+                                            disabled={geoStatus === 'detecting'}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#7C3AED]/10 text-[#7C3AED] rounded-lg text-[10px] font-bold hover:bg-[#7C3AED]/20 transition disabled:opacity-50"
+                                        >
+                                            {geoStatus === 'detecting'
+                                                ? <Loader2 size={12} className="animate-spin" />
+                                                : <LocateFixed size={12} />}
+                                            {geoStatus === 'detecting'
+                                                ? (isRTL ? 'جاري التحديد...' : 'Detecting...')
+                                                : (isRTL ? 'استخدام موقعي' : 'Use My Location')}
+                                        </button>
                                     </div>
-                                    <div>
-                                        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">{isRTL ? 'خط الطول' : 'Longitude'}</label>
-                                        <input
-                                            type="text"
-                                            value={formData.longitude}
-                                            onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
-                                            className="w-full bg-white border border-gray-200 rounded-2xl px-6 py-4 text-sm font-bold text-[#1E293B] outline-none focus:border-[#7C3AED] focus:ring-1 focus:ring-[#7C3AED] transition"
-                                        />
+                                    {/* GPS status bar */}
+                                    <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-bold border ${geoStatus === 'detected' ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                            : geoStatus === 'error' ? 'bg-red-50 text-red-600 border-red-200'
+                                                : geoStatus === 'detecting' ? 'bg-blue-50 text-blue-600 border-blue-200'
+                                                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                                        }`}>
+                                        {geoStatus === 'detected' && <><CheckCircle2 size={12} /> {isRTL ? 'تم تحديد موقعك' : 'GPS location detected'}</>}
+                                        {geoStatus === 'error' && <><AlertCircle size={12} /> {isRTL ? 'تعذر تحديد الموقع – يُستخدم موقع الرياض' : 'Location unavailable – using Riyadh default'}</>}
+                                        {geoStatus === 'detecting' && <><Loader2 size={12} className="animate-spin" /> {isRTL ? 'جاري تحديد الموقع...' : 'Detecting your location...'}</>}
+                                        {geoStatus === 'default' && <><MapPin size={12} /> {isRTL ? 'الموقع الافتراضي: الرياض (يمكن تعديله)' : 'Default: Riyadh – or use GPS above'}</>}
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">{isRTL ? 'خط العرض' : 'Latitude'}</label>
+                                            <input
+                                                type="number"
+                                                step="0.000001"
+                                                value={formData.latitude}
+                                                onChange={(e) => setFormData({ ...formData, latitude: parseFloat(e.target.value) })}
+                                                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-[#1E293B] outline-none focus:border-[#7C3AED] focus:ring-1 focus:ring-[#7C3AED] transition"
+                                                required
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">{isRTL ? 'خط الطول' : 'Longitude'}</label>
+                                            <input
+                                                type="number"
+                                                step="0.000001"
+                                                value={formData.longitude}
+                                                onChange={(e) => setFormData({ ...formData, longitude: parseFloat(e.target.value) })}
+                                                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-[#1E293B] outline-none focus:border-[#7C3AED] focus:ring-1 focus:ring-[#7C3AED] transition"
+                                                required
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="flex gap-3 pt-4">
@@ -380,7 +502,7 @@ export default function RequestsPage() {
                                         {isRTL ? 'إلغاء' : 'Cancel'}
                                     </button>
                                     <button type="submit" className="flex-1 px-6 py-3 bg-[#7C3AED] rounded-full text-sm font-bold text-white hover:bg-[#6D28D9] transition">
-                                                {editingRequest ? (isRTL ? 'تحديث' : 'Update') : (isRTL ? 'إنشاء' : 'Create')}
+                                        {editingRequest ? (isRTL ? 'تحديث' : 'Update') : (isRTL ? 'إنشاء' : 'Create')}
                                     </button>
                                 </div>
                             </form>
