@@ -216,4 +216,12 @@ class User extends Authenticatable
             'metadata' => $options['metadata'] ?? [],
         ]);
     }
+
+    /**
+     * Get all effective permissions for the user (including roles and direct).
+     */
+    public function getAllEffectivePermissions()
+    {
+        return $this->getAllPermissions();
+    }
 }

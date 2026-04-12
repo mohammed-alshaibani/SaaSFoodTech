@@ -56,9 +56,11 @@ Route::middleware('api-security')->group(function () {
         Route::patch('/requests/{serviceRequest}/work-done', [ServiceRequestController::class, 'workDone']);
         Route::patch('/requests/{serviceRequest}/drop', [ServiceRequestController::class, 'drop']);
 
-        // Customer actions: enforced by Controller
         Route::patch('/requests/{serviceRequest}/complete', [ServiceRequestController::class, 'complete']);
         Route::patch('/requests/{serviceRequest}/cancel', [ServiceRequestController::class, 'cancel']);
+
+        // ── Attachments ─────────────────────────────────────────
+        Route::post('/attachments/upload', [\App\Http\Controllers\AttachmentController::class, 'upload']);
 
         // throttle:10,1 = max 10 requests per 1 minute per user (per Architecture spec)
         Route::post('/ai/enhance', [AIController::class, 'enhance'])
