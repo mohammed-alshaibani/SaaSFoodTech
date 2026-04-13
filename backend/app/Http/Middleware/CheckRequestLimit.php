@@ -27,8 +27,9 @@ class CheckRequestLimit
         if ($user && $user->hasExceededRequestLimit()) {
             return response()->json([
                 'success' => false,
+                'error' => 'Rate limit exceeded',
                 'message' => 'Your monthly service request limit has been reached. Please upgrade your plan to create more requests.'
-            ], 403);
+            ], 429);
         }
 
         return $next($request);

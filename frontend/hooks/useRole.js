@@ -22,8 +22,14 @@ export function useRole() {
 
     const dashboardPath = useMemo(() => getDashboardPath(role), [role]);
 
+    const roleLabel = useMemo(() => {
+        if (!role) return 'Guest';
+        return role.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    }, [role]);
+
     return {
         role,
+        roleLabel,
         isRole: (targetRole) => role === targetRole,
         isAdmin: checkIsAdmin(role),
         isProvider: checkIsProvider(role),

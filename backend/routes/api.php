@@ -27,6 +27,10 @@ Route::middleware('api-security')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
 
+    // Public subscription plans (needed by landing Pricing page — no login required)
+    Route::get('/subscription/plans', [SubscriptionController::class, 'plans']);
+    Route::get('/subscription/providers', [SubscriptionController::class, 'providers']);
+
     // ═══════════════════════════════════════════════════════════
     // Protected routes — require valid authentication token
     // ═══════════════════════════════════════════════════════════
@@ -35,6 +39,12 @@ Route::middleware('api-security')->group(function () {
         // ── Auth ────────────────────────────────────────────────
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/logout', [AuthController::class, 'logout']);
+
+        // ── Notifications ───────────────────────────────────────
+        Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'index']);
+        Route::post('/notifications/mark-as-read', [\App\Http\Controllers\NotificationController::class, 'markAsRead']);
+        Route::patch('/notifications/{id}/read', [\App\Http\Controllers\NotificationController::class, 'read']);
+        Route::delete('/notifications/{id}', [\App\Http\Controllers\NotificationController::class, 'destroy']);
 
         // ── Service Requests ────────────────────────────────────
         // Geolocation: Nearby requests endpoint — MUST be before {serviceRequest} to avoid binding conflict
@@ -72,7 +82,7 @@ Route::middleware('api-security')->group(function () {
 
         // ── Subscription Management ─────────────────────────────────────
         Route::prefix('subscription')->group(function () {
-            Route::get('/plans', [SubscriptionController::class, 'plans']);
+            // /plans is public — defined above outside auth group
             Route::get('/usage', [SubscriptionController::class, 'usage']);
             Route::post('/upgrade', [SubscriptionController::class, 'upgrade']);
             // Simulation route (public)

@@ -59,7 +59,25 @@
         "saveFailed": "فشل الحفظ",
         "confirmDelete": "هل أنت متأكد؟",
         "deleteSuccess": "تم الحذف بنجاح",
-        "deleteFailed": "فشل الحذف"
+        "deleteFailed": "فشل الحذف",
+        "signedInAs": "تم تسجيل الدخول بصفتك"
+    },
+    "header": {
+        "profile": "الملف الشخصي",
+        "settings": "الإعدادات"
+    },
+    "notifications": {
+        "title": "التنبيهات",
+        "markAllRead": "تحديد الكل كمقروء",
+        "empty": "لا توجد تنبيهات بعد",
+        "viewAll": "عرض جميع التنبيهات",
+        "markRead": "تحديد كمقروء",
+        "newRequest": "طلب جديد",
+        "acceptedByProvider": "تم قبول طلبك",
+        "workDone": "تم إنجاز العمل",
+        "providerDropped": "الطلب متاح مرة أخرى",
+        "customerCompleted": "تم إكمال الطلب نهائياً",
+        "nearbyNew": "طلب جديد بالقرب منك"
     },
     "hero": {
         "badge": "منصة تكنولوجيا المطاعم",
@@ -161,7 +179,13 @@
         "requestsUsed": "طلبات مستخدمة",
         "emptyStateDesc": "ابدأ بإنشاء طلبك الأول باستخدام زر الطلبية الجديدة",
         "submissionFailed": "فشل الإرسال",
-        "requestCreated": "تم إنشاء الطلب"
+        "requestCreated": "تم إنشاء الطلب",
+        "acceptedSuccessfully": "تم قبول الطلب بنجاح!",
+        "completedSuccessfully": "تم إكمال الطلب بنجاح!",
+        "totalCustomers": "إجمالي العملاء",
+        "activeSubscriptions": "الاشتراكات النشطة",
+        "pendingSubscriptions": "في انتظار الموافقة",
+        "monthlyRevenue": "الإيرادات الشهرية"
     },
     "sidebar": {
         "mainMenu": "القائمة الرئيسية",

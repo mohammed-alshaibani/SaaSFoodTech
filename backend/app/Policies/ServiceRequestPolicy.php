@@ -17,7 +17,7 @@ class ServiceRequestPolicy
      */
     public function before(User $user, string $ability): bool|null
     {
-        if ($user->hasRole('admin')) {
+        if ($user->hasRole(['admin', 'Admin'])) {
             return true;
         }
 
@@ -38,8 +38,8 @@ class ServiceRequestPolicy
      */
     public function view(User $user, ServiceRequest $serviceRequest): bool
     {
-        // Provider Admin / Employee with view_all permission can see everything
-        if ($user->can('request.view_all')) {
+        // Provider Admin / Employee with view.all permission can see everything
+        if ($user->can('request.view.all')) {
             return true;
         }
 
@@ -49,7 +49,8 @@ class ServiceRequestPolicy
         }
 
         // Providers can see ANY 'pending' request to evaluate it before accepting
-        if ($user->hasRole(['provider_admin', 'provider_employee']) && $serviceRequest->status === 'pending') {
+        $providerRoles = ['provider_admin', 'provider_employee'];
+        if ($user->hasRole($providerRoles) && $serviceRequest->status === 'pending') {
             return true;
         }
 
@@ -62,20 +63,7 @@ class ServiceRequestPolicy
      */
     public function create(User $user): bool
     {
-        if (!$user->can('request.create')) {
-            return false;
-        }
-
-        // Subscription Gate (Free users can only create up to 3 requests)
-        // No need for over-engineered gating service; simple model check is sufficient for MVP.
-        if ($user->plan === 'free') {
-            $count = ServiceRequest::where('customer_id', $user->id)->count();
-            if ($count >= 3) {
-                return false;
-            }
-        }
-
-        return true;
+        return $user->can('request.create');
     }
 
     /**
@@ -84,7 +72,8 @@ class ServiceRequestPolicy
     public function accept(User $user, ServiceRequest $serviceRequest): bool
     {
         // Allow any provider role. Granular permission check is optional/bonus.
-        $isProvider = $user->hasRole(['provider_admin', 'provider_employee', 'provider']);
+        $providerRoles = ['provider_admin', 'provider_employee'];
+        $isProvider = $user->hasRole($providerRoles);
         if (!$isProvider) {
             return false;
         }
@@ -122,7 +111,7 @@ class ServiceRequestPolicy
      */
     public function update(User $user, ServiceRequest $serviceRequest): bool
     {
-        return $serviceRequest->customer_id == $user->id
+        return (int) $serviceRequest->customer_id === (int) $user->id
             && $serviceRequest->status === 'pending';
     }
 
@@ -131,7 +120,7 @@ class ServiceRequestPolicy
      */
     public function delete(User $user, ServiceRequest $serviceRequest): bool
     {
-        return $serviceRequest->customer_id == $user->id
+        return (int) $serviceRequest->customer_id === (int) $user->id
             && $serviceRequest->status === 'pending';
     }
 
@@ -140,8 +129,8 @@ class ServiceRequestPolicy
      */
     public function viewNearby(User $user): bool
     {
-        // Only providers can view nearby requests
-        return $user->hasRole(['provider_admin', 'provider_employee']) &&
-            $user->can('request.view_nearby');
+        // Only providers can view nearby requests (check both casings to be safe with different seeders)
+        $providerRoles = ['provider_admin', 'provider_employee'];
+        return $user->hasRole($providerRoles) && $user->can('request.view_nearby');
     }
 }

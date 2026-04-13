@@ -41,5 +41,24 @@ return Application::configure(basePath: dirname(__DIR__))
         \App\Providers\StrategyServiceProvider::class,
     ])
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        $exceptions->render(function (\Illuminate\Http\Exceptions\ThrottleRequestsException $e, $request) {
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'success' => false,
+                    'error' => [
+                        'code' => 'TOO_MANY_REQUESTS',
+                        'message' => 'Too many attempts. Please try again later.'
+                    ]
+                ], 429);
+            }
+        });
+
+        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\NotFoundHttpException $e, $request) {
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'error' => 'Not Found',
+                    'message' => $e->getMessage() ?: 'The requested resource could not be found.'
+                ], 404);
+            }
+        });
     })->create();

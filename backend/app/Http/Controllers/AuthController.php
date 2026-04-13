@@ -46,13 +46,22 @@ class AuthController extends Controller
 
     public function login(LoginRequest $request): JsonResponse
     {
+        $throttleKey = \Illuminate\Support\Str::lower($request->input('email')) . '|' . $request->ip();
+
+        if (\Illuminate\Support\Facades\RateLimiter::tooManyAttempts($throttleKey, 10)) {
+            throw new \Illuminate\Http\Exceptions\ThrottleRequestsException();
+        }
+
         $user = User::where('email', $request->email)->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
+            \Illuminate\Support\Facades\RateLimiter::hit($throttleKey);
             throw ValidationException::withMessages([
                 'email' => ['The provided credentials are incorrect.'],
             ]);
         }
+
+        \Illuminate\Support\Facades\RateLimiter::clear($throttleKey);
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
@@ -71,7 +80,10 @@ class AuthController extends Controller
 
     public function me(Request $request): JsonResponse
     {
-        return response()->json($this->buildUserPayload($request->user()));
+        return response()->json([
+            'success' => true,
+            'data' => $this->buildUserPayload($request->user())
+        ]);
     }
 
     private function buildUserPayload(User $user): array

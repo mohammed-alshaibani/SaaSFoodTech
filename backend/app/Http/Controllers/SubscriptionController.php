@@ -96,6 +96,9 @@ class SubscriptionController extends Controller
             'success' => true,
             'message' => $isMock ? 'Payment simulated successfully. Plan upgraded instantly.' : 'Upgrade request submitted successfully. Waiting for admin approval.',
             'data' => [
+                'user' => $user,
+                'new_plan' => $newPlan->name,
+                'previous_plan' => $currentPlanName,
                 'subscription_id' => $subscription->id,
                 'status' => $subscription->status
             ],
@@ -221,6 +224,20 @@ class SubscriptionController extends Controller
                 'plan' => $subscription->subscriptionPlan->name,
                 'status' => 'active'
             ]
+        ]);
+    }
+    /**
+     * GET /api/subscription/providers
+     * Get a list of available providers (businesses).
+     */
+    public function providers(): JsonResponse
+    {
+        // Get users with provider_admin role
+        $providers = User::role('provider_admin')->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => UserResource::collection($providers),
         ]);
     }
 }

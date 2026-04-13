@@ -59,10 +59,10 @@ export default function ProviderRequestsPage() {
             const standardData = reqsRes.data.data || [];
             const nearbyData = nearbyRes.data.data || [];
 
-            // Merge uniquely by ID
+            // Merge uniquely by ID - Standard (owned) data should overwrite discovery data
             const mergedMap = new Map();
-            standardData.forEach(r => mergedMap.set(r.id, r));
             nearbyData.forEach(r => mergedMap.set(r.id, r));
+            standardData.forEach(r => mergedMap.set(r.id, r));
 
             const requestData = Array.from(mergedMap.values());
 
@@ -118,6 +118,7 @@ export default function ProviderRequestsPage() {
             await api.patch(`/requests/${requestId}/accept`, { _action: 'accept' });
             setMessage({ type: 'success', text: t('requests.accepted') || 'Request accepted' });
             fetchRequests();
+            fetchStats();
         } catch (err) {
             setMessage({ type: 'error', text: err.response?.data?.message || t('requests.acceptError') || 'Failed to accept request' });
         }
@@ -128,6 +129,7 @@ export default function ProviderRequestsPage() {
             await api.patch(`/requests/${requestId}/complete`, { _action: 'complete' });
             setMessage({ type: 'success', text: t('requests.completed') || 'Request completed' });
             fetchRequests();
+            fetchStats();
         } catch (err) {
             setMessage({ type: 'error', text: err.response?.data?.message || t('requests.completeError') || 'Failed to complete request' });
         }

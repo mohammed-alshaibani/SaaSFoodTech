@@ -99,12 +99,16 @@ function RequestCard({ request, isRTL, onEdit, onDelete }) {
                     </span>
                 </div>
                 <div className="flex items-center gap-2">
-                    <button onClick={() => onEdit(request)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
-                        <Edit2 size={16} />
-                    </button>
-                    <button onClick={() => onDelete(request.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-                        <Trash2 size={16} />
-                    </button>
+                    {request.status === 'pending' && (
+                        <>
+                            <button onClick={() => onEdit(request)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                                <Edit2 size={16} />
+                            </button>
+                            <button onClick={() => onDelete(request.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                                <Trash2 size={16} />
+                            </button>
+                        </>
+                    )}
                     <Link
                         href={`/dashboard/customer/requests/${request.id}`}
                         className="flex items-center gap-1 text-sm font-bold text-[#7C3AED] hover:text-[#6D28D9] transition-colors"
@@ -129,7 +133,8 @@ export default function RequestsPage() {
     const [statusFilter, setStatusFilter] = useState('all');
     const [showModal, setShowModal] = useState(false);
     const [editingRequest, setEditingRequest] = useState(null);
-    const [formData, setFormData] = useState({ title: '', description: '', latitude: 24.7136, longitude: 46.6753 });
+    const [providers, setProviders] = useState([]);
+    const [formData, setFormData] = useState({ title: '', description: '', latitude: 24.7136, longitude: 46.6753, provider_id: '' });
     const [message, setMessage] = useState(null);
     const [isEnhancing, setIsEnhancing] = useState(false);
     const [geoStatus, setGeoStatus] = useState('default'); // 'default' | 'detecting' | 'detected' | 'error'
@@ -161,6 +166,15 @@ export default function RequestsPage() {
             console.error('[RequestsPage] Failed to load requests:', err);
         } finally {
             setLoading(false);
+        }
+    }, []);
+
+    const fetchProviders = useCallback(async () => {
+        try {
+            const res = await api.get('/subscription/providers');
+            setProviders(res.data.data ?? []);
+        } catch (err) {
+            console.error('[RequestsPage] Failed to load providers:', err);
         }
     }, []);
 
@@ -199,7 +213,7 @@ export default function RequestsPage() {
             }
             setShowModal(false);
             setEditingRequest(null);
-            setFormData({ title: '', description: '', latitude: 24.7136, longitude: 46.6753 });
+            setFormData({ title: '', description: '', latitude: 24.7136, longitude: 46.6753, provider_id: '' });
             fetchRequests();
         } catch (err) {
             console.error('Failed to save request:', err);
@@ -222,7 +236,8 @@ export default function RequestsPage() {
             title: request.title,
             description: request.description,
             latitude: request.latitude || '',
-            longitude: request.longitude || ''
+            longitude: request.longitude || '',
+            provider_id: request.provider_id || ''
         });
         setShowModal(true);
     };
@@ -242,13 +257,13 @@ export default function RequestsPage() {
     const closeModal = () => {
         setShowModal(false);
         setEditingRequest(null);
-        setFormData({ title: '', description: '', latitude: 24.7136, longitude: 46.6753 });
+        setFormData({ title: '', description: '', latitude: 24.7136, longitude: 46.6753, provider_id: '' });
         setGeoStatus('default');
     };
 
     const openNewModal = () => {
         setEditingRequest(null);
-        setFormData({ title: '', description: '', latitude: 24.7136, longitude: 46.6753 });
+        setFormData({ title: '', description: '', latitude: 24.7136, longitude: 46.6753, provider_id: '' });
         setGeoStatus('default');
         setShowModal(true);
         // Auto-detect on open
@@ -267,7 +282,8 @@ export default function RequestsPage() {
 
     useEffect(() => {
         fetchRequests();
-    }, [fetchRequests]);
+        fetchProviders();
+    }, [fetchRequests, fetchProviders]);
 
     const filteredRequests = requests.filter((req) => {
         const matchesSearch =
@@ -441,6 +457,21 @@ export default function RequestsPage() {
                                         {isEnhancing ? (isRTL ? 'جاري التحسين...' : 'Enhancing...') : (isRTL ? 'تحسين باستخدام الذكاء الاصطناعي' : 'Enhance strictly w/ AI')}
                                     </button>
                                 </div>
+                                {!editingRequest && (
+                                    <div>
+                                        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">{isRTL ? 'إسناد إلى مزود خدمة (اختياري)' : 'Assign to Provider (Optional)'}</label>
+                                        <select
+                                            value={formData.provider_id}
+                                            onChange={(e) => setFormData({ ...formData, provider_id: e.target.value })}
+                                            className="w-full bg-white border border-gray-200 rounded-2xl px-6 py-4 text-sm font-bold text-[#1E293B] outline-none focus:border-[#7C3AED] focus:ring-1 focus:ring-[#7C3AED] transition"
+                                        >
+                                            <option value="">{isRTL ? 'اختر مزود خدمة...' : 'Select a provider...'}</option>
+                                            {providers.map(provider => (
+                                                <option key={provider.id} value={provider.id}>{provider.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
                                 {/* Geolocation */}
                                 <div className="space-y-3">
                                     <div className="flex items-center justify-between">
@@ -463,9 +494,9 @@ export default function RequestsPage() {
                                     </div>
                                     {/* GPS status bar */}
                                     <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-bold border ${geoStatus === 'detected' ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                            : geoStatus === 'error' ? 'bg-red-50 text-red-600 border-red-200'
-                                                : geoStatus === 'detecting' ? 'bg-blue-50 text-blue-600 border-blue-200'
-                                                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                                        : geoStatus === 'error' ? 'bg-red-50 text-red-600 border-red-200'
+                                            : geoStatus === 'detecting' ? 'bg-blue-50 text-blue-600 border-blue-200'
+                                                : 'bg-amber-50 text-amber-700 border-amber-200'
                                         }`}>
                                         {geoStatus === 'detected' && <><CheckCircle2 size={12} /> {isRTL ? 'تم تحديد موقعك' : 'GPS location detected'}</>}
                                         {geoStatus === 'error' && <><AlertCircle size={12} /> {isRTL ? 'تعذر تحديد الموقع – يُستخدم موقع الرياض' : 'Location unavailable – using Riyadh default'}</>}

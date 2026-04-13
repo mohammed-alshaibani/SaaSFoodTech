@@ -20,6 +20,10 @@ Broadcast::channel('user.{id}', function ($user, $id) {
     return (int) $user->id === (int) $id;
 });
 
+Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
+    return (int) $user->id === (int) $id;
+});
+
 // ── Global service-requests admin channel ───────────────────────────────────
 // Only users with the 'admin' role may subscribe to the full feed.
 Broadcast::channel('service-requests', function ($user) {

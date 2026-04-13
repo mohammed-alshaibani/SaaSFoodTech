@@ -559,7 +559,9 @@ class AdminController extends Controller
             $plan = SubscriptionPlan::create([
                 'name' => $validated['name'],
                 'display_name' => $validated['name_ar'] ?? $validated['name'],
+                'name_ar' => $validated['name_ar'] ?? null,
                 'description' => $validated['description'] ?? '',
+                'description_ar' => $validated['description_ar'] ?? null,
                 'price' => $validated['price'],
                 'billing_cycle' => $validated['interval'],
                 'features' => $validated['features'] ?? [],
@@ -569,7 +571,8 @@ class AdminController extends Controller
             ]);
 
             return response()->json([
-                'message' => 'Plan created successfully',
+                'success' => true,
+                'message' => 'Subscription plan created successfully',
                 'data' => $plan
             ], 201);
         } catch (\Exception $e) {
@@ -610,10 +613,14 @@ class AdminController extends Controller
             $updateData = [];
             if (isset($validated['name']))
                 $updateData['name'] = $validated['name'];
-            if (isset($validated['name_ar']))
+            if (isset($validated['name_ar'])) {
                 $updateData['display_name'] = $validated['name_ar'];
+                $updateData['name_ar'] = $validated['name_ar'];
+            }
             if (isset($validated['description']))
                 $updateData['description'] = $validated['description'];
+            if (array_key_exists('description_ar', $validated))
+                $updateData['description_ar'] = $validated['description_ar'];
             if (isset($validated['price']))
                 $updateData['price'] = $validated['price'];
             if (isset($validated['interval']))

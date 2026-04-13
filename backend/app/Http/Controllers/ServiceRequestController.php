@@ -9,6 +9,7 @@ use App\Models\ServiceRequest;
 use App\Events\ServiceRequestCreated;
 use App\Events\ServiceRequestAccepted;
 use App\Events\ServiceRequestCompleted;
+use App\Events\ServiceRequestUpdated;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -17,6 +18,9 @@ use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Log;
 use App\Services\MainService;
 use App\DTOs\ServiceRequestDTO;
+use App\Notifications\RequestStatusNotification;
+use Illuminate\Support\Facades\Notification;
+use App\Models\User;
 
 class ServiceRequestController extends Controller
 {
@@ -52,9 +56,9 @@ class ServiceRequestController extends Controller
             );
         }
 
-        return ServiceRequestResource::collection(
-            $query->latest()->paginate(20)
-        );
+        $requests = $query->latest()->paginate(20);
+
+        return ServiceRequestResource::collection($requests)->additional(['success' => true]);
     }
 
     public function store(StoreServiceRequestRequest $request, MainService $mainService): JsonResponse
@@ -74,27 +78,62 @@ class ServiceRequestController extends Controller
 
         ServiceRequestCreated::dispatch($serviceRequest);
 
+        // Notify Admins
+        $admins = User::role('admin')->get();
+        Notification::send($admins, new RequestStatusNotification(
+            $serviceRequest,
+            "New service request created: {$serviceRequest->title}",
+            'created'
+        ));
+
+        // Notify targeted provider if exists
+        if ($dto->provider_id) {
+            $targetedProvider = User::find($dto->provider_id);
+            if ($targetedProvider) {
+                $targetedProvider->notify(new RequestStatusNotification(
+                    $serviceRequest,
+                    "You have a new targeted service request: {$serviceRequest->title}",
+                    'targeted_request'
+                ));
+            }
+        } else {
+            // Notify nearby providers (Optional: could be throttled or limited)
+            $providers = User::role(['provider_admin', 'provider_employee'])
+                ->whereNotNull('latitude')
+                ->get(); // In production, we'd filter by radius here
+
+            Notification::send($providers, new RequestStatusNotification(
+                $serviceRequest,
+                "New pending service request in your area: {$serviceRequest->title}",
+                'nearby_request'
+            ));
+        }
+
         $hasProviders = \App\Models\User::role(['provider_admin', 'provider_employee'])
             ->whereNotNull('latitude')
             ->count() > 0;
 
-        $response = new ServiceRequestResource($serviceRequest);
-        $result = $response->response()->setStatusCode(201);
-
+        $warnings = [];
         if (!$hasProviders) {
-            $data = $result->getData(true);
-            $data['warnings'] = ['No providers are currently registered with locations in your area. Acceptance may be delayed.'];
-            $result->setData($data);
+            $warnings = ['No providers are currently registered with locations in your area. Acceptance may be delayed.'];
         }
 
-        return $result;
+        return response()->json([
+            'success' => true,
+            'message' => 'Service request created successfully',
+            'data' => new ServiceRequestResource($serviceRequest->load(['customer'])),
+            'warnings' => $warnings,
+            'request_id' => request()->header('X-Request-ID'),
+            'timestamp' => now()->toISOString()
+        ], 201);
     }
 
     /**
      * Show a single service request
      */
-    public function show(ServiceRequest $serviceRequest): ServiceRequestResource
+    public function show($id): ServiceRequestResource
     {
+        $serviceRequest = ServiceRequest::findOrFail($id);
         $this->authorize('view', $serviceRequest);
         $serviceRequest->load(['customer', 'provider']);
         return new ServiceRequestResource($serviceRequest);
@@ -103,20 +142,21 @@ class ServiceRequestController extends Controller
     /**
      * Provider accepts a pending request
      */
-    public function accept(Request $request, ServiceRequest $serviceRequest, MainService $mainService): JsonResponse
+    public function accept(Request $request, $id, MainService $mainService): JsonResponse
     {
+        $serviceRequest = ServiceRequest::findOrFail($id);
         $user = $request->user();
 
         if (!$user->hasRole(['provider_admin', 'provider_employee', 'provider', 'admin'])) {
             return response()->json(['message' => 'Only providers can accept requests.'], 403);
         }
 
-        if ($serviceRequest->customer_id === $user->id) {
+        if ((int) $serviceRequest->customer_id === (int) $user->id) {
             return response()->json(['message' => 'You cannot accept your own request.'], 403);
         }
 
         // Case 1: You already own this request
-        if ($serviceRequest->provider_id === $user->id) {
+        if ((int) $serviceRequest->provider_id === (int) $user->id) {
             return response()->json([
                 'message' => 'You have already accepted this request.',
                 'data' => new ServiceRequestResource($serviceRequest->load(['customer', 'provider']))
@@ -146,6 +186,24 @@ class ServiceRequestController extends Controller
 
         $serviceRequest = $mainService->acceptServiceRequest($serviceRequest, $request->user()->id);
         ServiceRequestAccepted::dispatch($serviceRequest, $request->user()->id);
+        ServiceRequestUpdated::dispatch($serviceRequest, 'accepted');
+
+        // Notify Admins
+        $admins = User::role('admin')->get();
+        Notification::send($admins, new RequestStatusNotification(
+            $serviceRequest,
+            "Service request accepted by provider: {$serviceRequest->title}",
+            'accepted_admin'
+        ));
+
+        // Notify Customer
+        if ($serviceRequest->customer) {
+            $serviceRequest->customer->notify(new RequestStatusNotification(
+                $serviceRequest,
+                "Your request has been accepted by a provider: {$serviceRequest->title}",
+                'accepted_customer'
+            ));
+        }
 
         return response()->json([
             'message' => 'Service request accepted successfully',
@@ -156,14 +214,32 @@ class ServiceRequestController extends Controller
     /**
      * Provider marks an accepted request as work done
      */
-    public function workDone(Request $request, ServiceRequest $serviceRequest, MainService $mainService): JsonResponse
+    public function workDone(Request $request, $id, MainService $mainService): JsonResponse
     {
+        $serviceRequest = ServiceRequest::findOrFail($id);
         if ($serviceRequest->provider_id !== $request->user()->id || $serviceRequest->status !== 'accepted') {
             abort(403, 'Unauthorized sequence');
         }
 
         $serviceRequest = $mainService->workDoneServiceRequest($serviceRequest);
         ServiceRequestCompleted::dispatch($serviceRequest);
+        ServiceRequestUpdated::dispatch($serviceRequest, 'work_done');
+
+        // Notify Customer
+        if ($serviceRequest->customer) {
+            $serviceRequest->customer->notify(new RequestStatusNotification(
+                $serviceRequest,
+                "Provider marked work as done for: {$serviceRequest->title}",
+                'work_done_customer'
+            ));
+        }
+
+        // Notify Admin
+        Notification::send(User::role('admin')->get(), new RequestStatusNotification(
+            $serviceRequest,
+            "Work marked as done for request: {$serviceRequest->title}",
+            'work_done_admin'
+        ));
 
         return response()->json([
             'message' => 'Service request work marked as done',
@@ -174,13 +250,38 @@ class ServiceRequestController extends Controller
     /**
      * Customer marks a request as completed (approved)
      */
-    public function complete(Request $request, ServiceRequest $serviceRequest, MainService $mainService): JsonResponse
+    public function complete(Request $request, $id, MainService $mainService): JsonResponse
     {
-        if ($serviceRequest->customer_id !== $request->user()->id || $serviceRequest->status !== 'work_done') {
+        $serviceRequest = ServiceRequest::findOrFail($id);
+
+        // Allow BOTH customer and provider to complete, AND Admin
+        $user = $request->user();
+        $isCustomer = $serviceRequest->customer_id === $user->id;
+        $isProvider = $serviceRequest->provider_id === $user->id;
+        $isAdmin = $user->hasRole('admin');
+
+        if ((!$isCustomer && !$isProvider && !$isAdmin) || ($serviceRequest->status !== 'accepted' && $serviceRequest->status !== 'work_done')) {
             abort(403, 'Unauthorized sequence');
         }
 
         $serviceRequest = $mainService->completeServiceRequest($serviceRequest);
+        ServiceRequestUpdated::dispatch($serviceRequest, 'completed');
+
+        // Notify Provider
+        if ($serviceRequest->provider) {
+            $serviceRequest->provider->notify(new RequestStatusNotification(
+                $serviceRequest,
+                "Request officially completed by customer: {$serviceRequest->title}",
+                'completed_provider'
+            ));
+        }
+
+        // Notify Admin
+        Notification::send(User::role('admin')->get(), new RequestStatusNotification(
+            $serviceRequest,
+            "Service request completed: {$serviceRequest->title}",
+            'completed_admin'
+        ));
 
         return response()->json([
             'message' => 'Service request officially completed',
@@ -191,13 +292,22 @@ class ServiceRequestController extends Controller
     /**
      * Customer cancels a request
      */
-    public function cancel(Request $request, ServiceRequest $serviceRequest, MainService $mainService): JsonResponse
+    public function cancel(Request $request, $id, MainService $mainService): JsonResponse
     {
+        $serviceRequest = ServiceRequest::findOrFail($id);
         if ($serviceRequest->customer_id !== $request->user()->id || $serviceRequest->status !== 'pending') {
             abort(403, 'Only pending requests can be cancelled.');
         }
 
         $serviceRequest = $mainService->cancelServiceRequest($serviceRequest);
+        ServiceRequestUpdated::dispatch($serviceRequest, 'cancelled');
+
+        // Notify Admin
+        Notification::send(User::role('admin')->get(), new RequestStatusNotification(
+            $serviceRequest,
+            "Service request was cancelled by customer: {$serviceRequest->title}",
+            'cancelled_admin'
+        ));
 
         return response()->json([
             'message' => 'Service request cancelled successfully',
@@ -208,13 +318,31 @@ class ServiceRequestController extends Controller
     /**
      * Provider drops a request
      */
-    public function drop(Request $request, ServiceRequest $serviceRequest, MainService $mainService): JsonResponse
+    public function drop(Request $request, $id, MainService $mainService): JsonResponse
     {
+        $serviceRequest = ServiceRequest::findOrFail($id);
         if ($serviceRequest->provider_id !== $request->user()->id || $serviceRequest->status !== 'accepted') {
             abort(403, 'Unauthorized sequence.');
         }
 
         $serviceRequest = $mainService->dropServiceRequest($serviceRequest);
+        ServiceRequestUpdated::dispatch($serviceRequest, 'dropped');
+
+        // Notify Customer
+        if ($serviceRequest->customer) {
+            $serviceRequest->customer->notify(new RequestStatusNotification(
+                $serviceRequest,
+                "Provider has dropped your request: {$serviceRequest->title}. It is now pending again.",
+                'dropped_customer'
+            ));
+        }
+
+        // Notify Admin
+        Notification::send(User::role('admin')->get(), new RequestStatusNotification(
+            $serviceRequest,
+            "Service request dropped by provider: {$serviceRequest->title}",
+            'dropped_admin'
+        ));
 
         return response()->json([
             'message' => 'Service request dropped successfully',
@@ -225,17 +353,11 @@ class ServiceRequestController extends Controller
     /**
      * Update an existing service request
      */
-    public function update(UpdateServiceRequestRequest $request, ServiceRequest $serviceRequest): JsonResponse
+    public function update(UpdateServiceRequestRequest $request, $id): JsonResponse
     {
-        // Allow admin OR owner
-        if (!$request->user()->hasRole('admin') && $serviceRequest->customer_id != $request->user()->id) {
-            abort(403, 'You do not own this request.');
-        }
-
-        // Admins can update any status, customers only pending
-        if (!$request->user()->hasRole('admin') && $serviceRequest->status !== 'pending') {
-            abort(403, 'Only pending requests can be updated.');
-        }
+        $serviceRequest = ServiceRequest::findOrFail($id);
+        // Use policy for authorization (Policy has 'before' method for admins)
+        $this->authorize('update', $serviceRequest);
 
         $serviceRequest->update($request->only([
             'title',
@@ -245,10 +367,14 @@ class ServiceRequestController extends Controller
             'category',
             'urgency',
             'business_area',
-            'status' // Allow status update for admins
+            'status', // Allow status update
+            'provider_id'
         ]));
 
+        ServiceRequestUpdated::dispatch($serviceRequest, 'updated');
+
         return response()->json([
+            'success' => true,
             'message' => 'Service request updated successfully',
             'data' => new ServiceRequestResource($serviceRequest->load(['customer', 'provider']))
         ]);
@@ -257,16 +383,19 @@ class ServiceRequestController extends Controller
     /**
      * Delete a service request
      */
-    public function destroy(Request $request, ServiceRequest $serviceRequest): JsonResponse
+    public function destroy(Request $request, $id): JsonResponse
     {
+        $serviceRequest = ServiceRequest::findOrFail($id);
         try {
-            // Allow admin OR owner
-            if (!$request->user()->hasRole('admin') && $serviceRequest->customer_id != $request->user()->id) {
-                return response()->json(['message' => 'Unauthorized deletion attempt'], 403);
-            }
+            // Use policy for authorization
+            $this->authorize('delete', $serviceRequest);
 
-            // Manually delete attachments first to avoid constraint issues if cascade fails
-            $serviceRequest->attachments()->delete();
+            // Safely delete attachments first (ignore if relation doesn't exist)
+            try {
+                $serviceRequest->attachments()->delete();
+            } catch (\Exception $e) {
+                Log::warning("Could not delete attachments for request #{$serviceRequest->id}: " . $e->getMessage());
+            }
 
             // Perform the deletion
             $serviceRequest->delete();
@@ -303,7 +432,7 @@ class ServiceRequestController extends Controller
         $lng = (float) $request->longitude;
         $radius = (float) ($request->radius ?? 50);
 
-        $query = ServiceRequest::with(['customer'])->nearby($lat, $lng, $radius);
+        $query = ServiceRequest::with(['customer', 'provider'])->nearby($lat, $lng, $radius);
 
         if ($request->has('status')) {
             $query->where('status', $request->status);

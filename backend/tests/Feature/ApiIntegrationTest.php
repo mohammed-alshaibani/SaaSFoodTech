@@ -20,10 +20,10 @@ class ApiIntegrationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Run seeders
         $this->seed(\Database\Seeders\AdvancedRbacSeeder::class);
-        
+
         // Fake queues and mail for testing
         Queue::fake();
         Mail::fake();
@@ -36,17 +36,17 @@ class ApiIntegrationTest extends TestCase
         // Create customer
         $customer = User::factory()->create();
         $customer->assignRole('Customer');
-        
+
         // Create provider
         $provider = User::factory()->create([
             'latitude' => 40.7128,
             'longitude' => -74.0060,
         ]);
         $provider->assignRole('Provider');
-        
+
         // Step 1: Customer creates request
         Sanctum::actingAs($customer);
-        
+
         $requestData = [
             'title' => 'Need plumbing repair',
             'description' => 'Kitchen sink is leaking badly',
@@ -56,32 +56,32 @@ class ApiIntegrationTest extends TestCase
 
         $response = $this->postJson('/api/requests', $requestData);
         $response->assertStatus(201);
-        
+
         $serviceRequest = ServiceRequest::first();
         $this->assertEquals('pending', $serviceRequest->status);
-        
+
         // Step 2: Provider views nearby requests
         Sanctum::actingAs($provider);
-        
+
         $response = $this->getJson('/api/requests?nearby=true&radius=50');
         $response->assertStatus(200)
-                ->assertJsonFragment(['id' => $serviceRequest->id]);
-        
+            ->assertJsonFragment(['id' => $serviceRequest->id]);
+
         // Step 3: Provider accepts request
         $response = $this->patchJson("/api/requests/{$serviceRequest->id}/accept");
         $response->assertStatus(200);
-        
+
         $serviceRequest->refresh();
         $this->assertEquals('accepted', $serviceRequest->status);
         $this->assertEquals($provider->id, $serviceRequest->provider_id);
-        
+
         // Step 4: Provider completes request
         $response = $this->patchJson("/api/requests/{$serviceRequest->id}/complete");
         $response->assertStatus(200);
-        
+
         $serviceRequest->refresh();
         $this->assertEquals('completed', $serviceRequest->status);
-        
+
         // Verify notifications were queued
         Queue::assertPushed(\App\Jobs\SendNotificationJob::class, function ($job) use ($customer, $provider) {
             return $job->user->id === $customer->id && $job->type === 'request.accepted';
@@ -93,22 +93,22 @@ class ApiIntegrationTest extends TestCase
     {
         $customer = User::factory()->create();
         $customer->assignRole('Customer');
-        
+
         Sanctum::actingAs($customer);
-        
+
         // Create request with minimal description
         $serviceRequest = ServiceRequest::factory()->create([
             'customer_id' => $customer->id,
             'title' => 'Fix sink',
             'description' => 'broken',
         ]);
-        
+
         // Request AI enhancement
         $response = $this->postJson('/api/ai/enhance', [
             'title' => $serviceRequest->title,
             'description' => $serviceRequest->description,
         ]);
-        
+
         $response->assertStatus(200);
         $response->assertJsonStructure([
             'enhanced_title',
@@ -116,7 +116,7 @@ class ApiIntegrationTest extends TestCase
             'suggested_category',
             'confidence_score',
         ]);
-        
+
         // Verify AI job was queued
         Queue::assertPushed(\App\Jobs\ProcessAICategorizationJob::class);
     }
@@ -126,12 +126,12 @@ class ApiIntegrationTest extends TestCase
     {
         $customer = User::factory()->create(['plan' => 'free']);
         $customer->assignRole('Customer');
-        
+
         Sanctum::actingAs($customer);
-        
+
         // Create requests up to limit
         ServiceRequest::factory()->count(3)->create(['customer_id' => $customer->id]);
-        
+
         // Try to create one more (should fail)
         $response = $this->postJson('/api/requests', [
             'title' => 'Fourth request',
@@ -139,11 +139,14 @@ class ApiIntegrationTest extends TestCase
             'latitude' => 40.7128,
             'longitude' => -74.0060,
         ]);
-        
+
         $response->assertStatus(429)
-                ->assertJsonFragment([
-                    'error' => 'Rate limit exceeded',
-                ]);
+            ->assertJsonFragment([
+                'error' => [
+                    'code' => 'TOO_MANY_REQUESTS',
+                    'message' => 'Too many attempts. Please try again later.'
+                ],
+            ]);
     }
 
     /** @test */
@@ -152,23 +155,23 @@ class ApiIntegrationTest extends TestCase
         // Create admin user
         $admin = User::factory()->create();
         $admin->assignRole('Admin');
-        
+
         // Create provider admin user
         $providerAdmin = User::factory()->create();
         $providerAdmin->assignRole('Provider Admin');
-        
+
         // Test admin can access provider management
         Sanctum::actingAs($admin);
-        
+
         $response = $this->getJson('/api/admin/users');
         $response->assertStatus(200);
-        
+
         // Test provider admin cannot access admin endpoints
         Sanctum::actingAs($providerAdmin);
-        
+
         $response = $this->getJson('/api/admin/users');
         $response->assertStatus(403);
-        
+
         // But provider admin can manage providers
         $response = $this->getJson('/api/roles');
         $response->assertStatus(200);
@@ -179,21 +182,21 @@ class ApiIntegrationTest extends TestCase
     {
         $customer = User::factory()->create();
         $customer->assignRole('Customer');
-        
+
         Sanctum::actingAs($customer);
-        
+
         // Test validation error
         $response = $this->postJson('/api/requests', []);
         $response->assertStatus(422)
-                ->assertJsonValidationErrors(['title', 'description', 'latitude', 'longitude']);
-        
+            ->assertJsonValidationErrors(['title', 'description', 'latitude', 'longitude']);
+
         // Test not found error
         $response = $this->getJson('/api/requests/99999');
         $response->assertStatus(404);
-        
+
         // Test authorization error
         Sanctum::actingAs($customer);
-        
+
         $otherRequest = ServiceRequest::factory()->create();
         $response = $this->deleteJson("/api/requests/{$otherRequest->id}");
         $response->assertStatus(403);
@@ -204,20 +207,20 @@ class ApiIntegrationTest extends TestCase
     {
         $customer = User::factory()->create();
         $customer->assignRole('Customer');
-        
+
         Sanctum::actingAs($customer);
-        
+
         // Create multiple requests
         ServiceRequest::factory()->count(5)->create(['customer_id' => $customer->id]);
-        
+
         // First request should cache results
         $response1 = $this->getJson('/api/requests');
         $response1->assertStatus(200);
-        
+
         // Second request should use cache
         $response2 = $this->getJson('/api/requests');
         $response2->assertStatus(200);
-        
+
         // Verify cache was used (same response time/data)
         $this->assertEquals(
             $response1->json('data'),
@@ -230,9 +233,9 @@ class ApiIntegrationTest extends TestCase
     {
         $customer = User::factory()->create();
         $customer->assignRole('Customer');
-        
+
         Sanctum::actingAs($customer);
-        
+
         // Simulate concurrent requests
         $responses = [];
         for ($i = 0; $i < 5; $i++) {
@@ -243,12 +246,12 @@ class ApiIntegrationTest extends TestCase
                 'longitude' => -74.0060 + ($i * 0.001),
             ]);
         }
-        
+
         // All should succeed
         foreach ($responses as $response) {
             $response->assertStatus(201);
         }
-        
+
         // Verify all requests were created
         $this->assertEquals(5, ServiceRequest::count());
     }
@@ -258,10 +261,10 @@ class ApiIntegrationTest extends TestCase
     {
         $customer = User::factory()->create();
         $provider = User::factory()->create();
-        
+
         $customer->assignRole('Customer');
         $provider->assignRole('Provider');
-        
+
         // Create request
         Sanctum::actingAs($customer);
         $response = $this->postJson('/api/requests', [
@@ -270,10 +273,10 @@ class ApiIntegrationTest extends TestCase
             'latitude' => 40.7128,
             'longitude' => -74.0060,
         ]);
-        
+
         $response->assertStatus(201);
         $serviceRequest = ServiceRequest::first();
-        
+
         // Verify data consistency
         $this->assertEquals('Test Request', $serviceRequest->title);
         $this->assertEquals('Test Description', $serviceRequest->description);
@@ -281,12 +284,12 @@ class ApiIntegrationTest extends TestCase
         $this->assertEquals('pending', $serviceRequest->status);
         $this->assertNotNull($serviceRequest->created_at);
         $this->assertNotNull($serviceRequest->updated_at);
-        
+
         // Accept request
         Sanctum::actingAs($provider);
         $response = $this->patchJson("/api/requests/{$serviceRequest->id}/accept");
         $response->assertStatus(200);
-        
+
         // Verify consistency after accept
         $serviceRequest->refresh();
         $this->assertEquals('accepted', $serviceRequest->status);
@@ -298,7 +301,7 @@ class ApiIntegrationTest extends TestCase
     public function security_headers_and_cors()
     {
         $response = $this->getJson('/api/docs/api-docs.yaml');
-        
+
         // Verify security headers
         $response->assertHeader('Access-Control-Allow-Origin', '*');
         $response->assertHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -310,14 +313,14 @@ class ApiIntegrationTest extends TestCase
     {
         $freeUser = User::factory()->create(['plan' => 'free']);
         $premiumUser = User::factory()->create(['plan' => 'premium']);
-        
+
         $freeUser->assignRole('Customer');
         $premiumUser->assignRole('Customer');
-        
+
         // Test free user limit
         Sanctum::actingAs($freeUser);
         ServiceRequest::factory()->count(3)->create(['customer_id' => $freeUser->id]);
-        
+
         $response = $this->postJson('/api/requests', [
             'title' => 'Exceeds limit',
             'description' => 'Should be rate limited',
@@ -325,11 +328,11 @@ class ApiIntegrationTest extends TestCase
             'longitude' => -74.0060,
         ]);
         $response->assertStatus(429);
-        
+
         // Test premium user has higher limit
         Sanctum::actingAs($premiumUser);
         ServiceRequest::factory()->count(50)->create(['customer_id' => $premiumUser->id]);
-        
+
         $response = $this->postJson('/api/requests', [
             'title' => 'Within premium limit',
             'description' => 'Should succeed',
@@ -344,29 +347,29 @@ class ApiIntegrationTest extends TestCase
     {
         $customer = User::factory()->create();
         $provider = User::factory()->create();
-        
+
         $customer->assignRole('Customer');
         $provider->assignRole('Provider');
-        
+
         // Create and accept request
         Sanctum::actingAs($customer);
         $serviceRequest = ServiceRequest::factory()->create(['customer_id' => $customer->id]);
-        
+
         Sanctum::actingAs($provider);
         $this->patchJson("/api/requests/{$serviceRequest->id}/accept");
-        
+
         // Verify notification job was dispatched
         Queue::assertPushed(\App\Jobs\SendNotificationJob::class, function ($job) use ($customer) {
-            return $job->user->id === $customer->id && 
-                   $job->type === 'request.accepted' &&
-                   isset($job->data['provider_name']);
+            return $job->user->id === $customer->id &&
+                $job->type === 'request.accepted' &&
+                isset($job->data['provider_name']);
         });
-        
+
         // Verify notification data structure
         Queue::assertPushed(\App\Jobs\SendNotificationJob::class, function ($job) {
-            return isset($job->data['title']) && 
-                   isset($job->data['provider_name']) &&
-                   isset($job->data['request_id']);
+            return isset($job->data['title']) &&
+                isset($job->data['provider_name']) &&
+                isset($job->data['request_id']);
         });
     }
 
@@ -375,51 +378,51 @@ class ApiIntegrationTest extends TestCase
     {
         $customer = User::factory()->create();
         $customer->assignRole('Customer');
-        
+
         Sanctum::actingAs($customer);
-        
+
         // Test list endpoint
         $listResponse = $this->getJson('/api/requests');
         $listResponse->assertStatus(200)
-                   ->assertJsonStructure([
-                       'data' => [
-                           '*' => [
-                               'id',
-                               'title',
-                               'description',
-                               'status',
-                               'created_at',
-                               'updated_at',
-                           ]
-                       ],
-                       'links',
-                       'meta',
-                   ]);
-        
+            ->assertJsonStructure([
+                'data' => [
+                    '*' => [
+                        'id',
+                        'title',
+                        'description',
+                        'status',
+                        'created_at',
+                        'updated_at',
+                    ]
+                ],
+                'links',
+                'meta',
+            ]);
+
         // Test show endpoint
         $serviceRequest = ServiceRequest::factory()->create(['customer_id' => $customer->id]);
         $showResponse = $this->getJson("/api/requests/{$serviceRequest->id}");
         $showResponse->assertStatus(200)
-                  ->assertJsonStructure([
-                      'id',
-                      'title',
-                      'description',
-                      'status',
-                      'created_at',
-                      'updated_at',
-                      'customer' => [
-                          'id',
-                          'name',
-                          'email',
-                      ],
-                  ]);
-        
+            ->assertJsonStructure([
+                'id',
+                'title',
+                'description',
+                'status',
+                'created_at',
+                'updated_at',
+                'customer' => [
+                    'id',
+                    'name',
+                    'email',
+                ],
+            ]);
+
         // Test error response format
         $errorResponse = $this->getJson('/api/requests/99999');
         $errorResponse->assertStatus(404)
-                    ->assertJsonStructure([
-                        'error',
-                        'message',
-                    ]);
+            ->assertJsonStructure([
+                'error',
+                'message',
+            ]);
     }
 }

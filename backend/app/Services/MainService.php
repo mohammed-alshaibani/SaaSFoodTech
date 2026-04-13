@@ -19,6 +19,7 @@ class MainService
 
         $serviceRequest = ServiceRequest::create([
             'customer_id' => $userId,
+            'provider_id' => $dto->provider_id,
             'title' => $dto->title,
             'description' => $dto->description,
             'latitude' => $dto->latitude,

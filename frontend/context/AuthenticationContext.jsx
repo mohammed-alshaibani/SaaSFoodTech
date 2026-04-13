@@ -13,9 +13,10 @@ export function AuthenticationProvider({ children }) {
     const hydrateUser = useCallback(async () => {
         try {
             const response = await api.get('/me');
-            setUser(response.data);
+            const userData = response.data.data || response.data;
+            setUser(userData);
             setError(null);
-            return response.data;
+            return userData;
         } catch (error) {
             setUser(null);
             setError(error.message);

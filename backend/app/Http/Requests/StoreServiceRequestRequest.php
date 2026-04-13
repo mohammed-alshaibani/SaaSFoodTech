@@ -77,6 +77,10 @@ class StoreServiceRequestRequest extends FormRequest
                 'string',
                 'in:low,medium,high,emergency',
             ],
+            'provider_id' => [
+                'nullable',
+                'exists:users,id',
+            ],
         ];
     }
 

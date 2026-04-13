@@ -91,7 +91,6 @@ Included an AI enhancement feature to improve service quality:
 - **AI Enhancement**: Integrated Google Gemini API to automatically improve service request descriptions, adding professional value to customer postings.
 
 ## Default Credentials
-
 Admin: admin@example.com / password
 Provider: provider@example.com / password
 Customer: john@example.com / password

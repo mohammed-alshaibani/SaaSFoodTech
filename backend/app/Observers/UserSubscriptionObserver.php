@@ -13,7 +13,7 @@ class UserSubscriptionObserver
     public function created(UserSubscription $userSubscription): void
     {
         if ($userSubscription->status === 'active') {
-             $this->handleActivation($userSubscription);
+            $this->handleActivation($userSubscription);
         }
     }
 
@@ -47,14 +47,15 @@ class UserSubscriptionObserver
         // 2. Perform RBAC updates
         // Grant premium-specific permissions directly for instant access
         if ($plan->name === 'premium' || $plan->name === 'enterprise') {
-            $user->grantPermission('ai.enhance.description', 'Subscription Upgrade: ' . $plan->name);
-            $user->grantPermission('ai.suggest.pricing', 'Subscription Upgrade: ' . $plan->name);
-            $user->grantPermission('unlimited_requests', 'Subscription Upgrade: ' . $plan->name);
+            $user->givePermissionTo('ai.enhance.description');
+            $user->givePermissionTo('ai.suggest.pricing');
+            // 'unlimited_requests' is a virtual permission, if it doesn't exist givePermissionTo will fail.
+            // Spatie recommends only giving existing permissions.
         }
 
         if ($plan->name === 'enterprise') {
-            $user->grantPermission('analytics.view', 'Enterprise Subscription Activation');
-            $user->grantPermission('analytics.export', 'Enterprise Subscription Activation');
+            $user->givePermissionTo('analytics.view');
+            $user->givePermissionTo('analytics.export');
         }
 
         // 3. Log the history record
@@ -62,7 +63,7 @@ class UserSubscriptionObserver
             'user_id' => $user->id,
             'permissions_granted' => ($plan->name === 'premium' || $plan->name === 'enterprise') ? ['ai.enhance', 'suggest.pricing'] : []
         ]);
-        
+
         // 4. Future-ready: Trigger Email/Dashboard Notification
         // $user->notify(new \App\Notifications\SubscriptionActivated($plan));
     }

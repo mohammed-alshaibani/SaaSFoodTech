@@ -11,11 +11,50 @@ use App\Traits\HasGeolocation;
 class ServiceRequest extends Model
 {
     use HasFactory, HasFileUploads, HasGeolocation;
+
+    protected static function booted()
+    {
+        static::created(function ($request) {
+            if ($request->provider_id && $request->provider) {
+                $request->provider->notify(new \App\Notifications\RequestAssignedNotification($request));
+            }
+        });
+
+        static::updated(function ($request) {
+            $actorId = \Illuminate\Support\Facades\Auth::id();
+
+            if ($request->isDirty('status')) {
+                if ($request->customer && $request->customer->id !== $actorId) {
+                    $request->customer->notify(new \App\Notifications\RequestStatusChangedNotification(
+                        $request,
+                        $request->getOriginal('status'),
+                        $request->status
+                    ));
+                }
+
+                if ($request->provider && $request->provider->id !== $actorId) {
+                    $request->provider->notify(new \App\Notifications\RequestStatusChangedNotification(
+                        $request,
+                        $request->getOriginal('status'),
+                        $request->status
+                    ));
+                }
+            }
+
+            if ($request->isDirty('provider_id') && $request->provider_id && $request->provider && $request->provider->id !== $actorId) {
+                $request->provider->notify(new \App\Notifications\RequestAssignedNotification($request));
+            }
+        });
+    }
+
     protected $fillable = [
         'customer_id',
         'provider_id',
         'title',
         'description',
+        'category',
+        'urgency',
+        'business_area',
         'status',
         'latitude',
         'longitude',
@@ -46,8 +85,8 @@ class ServiceRequest extends Model
     public function scopeNearby($query, float $lat, float $lng, float $radiusKm = 50)
     {
         if (config('database.default') === 'sqlite') {
-            $latDelta = $radiusKm / 111.32;
-            $lngDelta = $radiusKm / (111.32 * cos(deg2rad($lat)));
+            $latDelta = $radiusKm / 100.0;
+            $lngDelta = $radiusKm / (100.0 * cos(deg2rad($lat)));
 
             return $query
                 ->whereBetween('latitude', [$lat - $latDelta, $lat + $latDelta])

@@ -24,9 +24,14 @@ class RolePermissionSeeder extends Seeder
             'request.create',
             'request.accept',
             'request.complete',
-            'request.view_all',
+            'request.view.all',
+            'request.view.own',
+            'request.update.own',
+            'request.delete.own',
             'request.view_nearby',
             'user.manage',
+            'user.view.own',
+            'user.update.own',
             'permission.assign',
             'permission.view',
             'permission.create',
@@ -36,6 +41,13 @@ class RolePermissionSeeder extends Seeder
             'role.create',
             'role.update',
             'role.delete',
+            'file.upload',
+            'file.view.own',
+            'file.delete.own',
+            'ai.enhance.description',
+            'ai.suggest.pricing',
+            'analytics.view',
+            'analytics.export',
         ];
 
         foreach ($permissions as $permission) {
@@ -47,12 +59,38 @@ class RolePermissionSeeder extends Seeder
         $admin->givePermissionTo(Permission::where('guard_name', 'sanctum')->get());
 
         $providerAdmin = Role::firstOrCreate(['name' => 'provider_admin', 'guard_name' => 'sanctum']);
-        $providerAdmin->givePermissionTo(Permission::where('guard_name', 'sanctum')->whereIn('name', ['request.accept', 'request.complete', 'request.view_all', 'request.view_nearby', 'permission.assign'])->get());
+        $providerAdmin->givePermissionTo(Permission::where('guard_name', 'sanctum')->whereIn('name', [
+            'request.accept',
+            'request.complete',
+            'request.view.all',
+            'request.view_nearby',
+            'permission.assign',
+            'user.view.own',
+            'user.update.own',
+            'file.upload',
+            'file.view.own',
+            'ai.enhance.description',
+            'analytics.view'
+        ])->get());
 
         $providerEmployee = Role::firstOrCreate(['name' => 'provider_employee', 'guard_name' => 'sanctum']);
-        $providerEmployee->givePermissionTo(Permission::where('guard_name', 'sanctum')->whereIn('name', ['request.accept', 'request.complete', 'request.view_nearby'])->get());
+        $providerEmployee->givePermissionTo(Permission::where('guard_name', 'sanctum')->whereIn('name', [
+            'request.accept',
+            'request.complete',
+            'request.view_nearby',
+            'request.view.own',
+            'user.view.own',
+            'user.update.own'
+        ])->get());
 
         $customer = Role::firstOrCreate(['name' => 'customer', 'guard_name' => 'sanctum']);
-        $customer->givePermissionTo(Permission::where('guard_name', 'sanctum')->where('name', 'request.create')->get());
+        $customer->givePermissionTo(Permission::where('guard_name', 'sanctum')->whereIn('name', [
+            'request.create',
+            'request.view.own',
+            'request.update.own',
+            'request.delete.own',
+            'user.view.own',
+            'user.update.own'
+        ])->get());
     }
 }

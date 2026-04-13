@@ -45,7 +45,7 @@ USER www
 EXPOSE 9000
 
 # Run composer install
-RUN composer install --no-dev --optimize-autoloader
+RUN composer install --optimize-autoloader
 
 # Copy PHP configuration
 COPY php.ini /usr/local/etc/php/conf.d/custom.ini

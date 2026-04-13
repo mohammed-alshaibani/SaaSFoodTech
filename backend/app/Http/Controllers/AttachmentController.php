@@ -26,18 +26,23 @@ class AttachmentController extends Controller
         $path = $file->storeAs('attachments', $filename, 'public');
 
         $attachment = $serviceRequest->attachments()->create([
-            'filename' => $filename,
-            'original_filename' => $file->getClientOriginalName(),
+            'uploaded_by' => $request->user()->id,
+            'file_path' => $path,
+            'original_name' => $file->getClientOriginalName(),
             'file_type' => $this->getFileType($file->getClientOriginalExtension()),
             'file_size' => $file->getSize(),
-            'path' => $path,
         ]);
 
         return response()->json([
             'success' => true,
-            'data' => array_merge($attachment->toArray(), [
+            'data' => [
+                'id' => $attachment->id,
+                'filename' => $filename,
+                'original_filename' => $attachment->original_name,
+                'file_type' => $attachment->file_type,
+                'file_size' => $attachment->file_size,
                 'download_url' => Storage::disk('public')->url($path),
-            ]),
+            ],
         ], 201);
     }
 

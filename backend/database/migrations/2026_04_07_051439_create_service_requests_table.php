@@ -16,7 +16,9 @@ return new class extends Migration {
             $table->foreignId('provider_id')->nullable()->constrained('users')->onDelete('set null');
             $table->string('title');
             $table->text('description');
-            $table->enum('status', ['pending', 'accepted', 'completed'])->default('pending');
+            $table->string('category')->nullable();
+            $table->enum('urgency', ['low', 'medium', 'high', 'critical'])->default('low');
+            $table->enum('status', ['pending', 'accepted', 'work_done', 'completed', 'cancelled'])->default('pending');
             $table->decimal('latitude', 10, 8);
             $table->decimal('longitude', 11, 8);
             $table->timestamp('accepted_at')->nullable();

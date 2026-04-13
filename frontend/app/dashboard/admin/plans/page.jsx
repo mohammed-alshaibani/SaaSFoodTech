@@ -9,7 +9,7 @@ import api from '@/lib/api';
 export default function PlansDashboard() {
     const { t, language } = useI18n();
     const isRTL = language === 'ar';
-    
+
     const [plans, setPlans] = useState([]);
     const [showForm, setShowForm] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -21,7 +21,7 @@ export default function PlansDashboard() {
         description: '',
         description_ar: '',
         price: '',
-        interval: 'monthly',
+        billing_cycle: 'monthly',
         request_limit: '',
         features: ['', '', '']
     });
@@ -47,7 +47,7 @@ export default function PlansDashboard() {
                     description: formData.description,
                     description_ar: formData.description_ar,
                     price: parseFloat(formData.price),
-                    interval: formData.interval,
+                    interval: formData.billing_cycle,
                     limits: {
                         requests: parseInt(formData.request_limit)
                     },
@@ -61,7 +61,7 @@ export default function PlansDashboard() {
                     description: formData.description,
                     description_ar: formData.description_ar,
                     price: parseFloat(formData.price),
-                    interval: formData.interval,
+                    interval: formData.billing_cycle,
                     limits: {
                         requests: parseInt(formData.request_limit)
                     },
@@ -77,7 +77,7 @@ export default function PlansDashboard() {
                 description: '',
                 description_ar: '',
                 price: '',
-                interval: 'monthly',
+                billing_cycle: 'monthly',
                 request_limit: '',
                 features: ['', '', '']
             });
@@ -91,11 +91,11 @@ export default function PlansDashboard() {
         setEditingPlan(plan);
         setFormData({
             name: plan.name || '',
-            name_ar: plan.name_ar || '',
+            name_ar: plan.name_ar || plan.display_name || '',
             description: plan.description || '',
             description_ar: plan.description_ar || '',
             price: plan.price || '',
-            interval: plan.interval || 'monthly',
+            billing_cycle: plan.billing_cycle || 'monthly',
             request_limit: plan.limits?.requests || '',
             features: (Array.isArray(plan.features) ? plan.features : []) || ['', '', '']
         });
@@ -122,7 +122,7 @@ export default function PlansDashboard() {
             description: '',
             description_ar: '',
             price: '',
-            interval: 'monthly',
+            billing_cycle: 'monthly',
             request_limit: '',
             features: ['', '', '']
         });
@@ -194,153 +194,153 @@ export default function PlansDashboard() {
                                 </button>
                             </div>
                             <form onSubmit={handleSubmit} className="space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                                        {t('plans.nameEn')}
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.name}
-                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                        required
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                                        {t('plans.nameAr')}
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.name_ar}
-                                        onChange={(e) => setFormData({ ...formData, name_ar: e.target.value })}
-                                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                        dir="rtl"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                                        {t('plans.descriptionEn')}
-                                    </label>
-                                    <textarea
-                                        value={formData.description}
-                                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                        rows={3}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                                        {t('plans.descriptionAr')}
-                                    </label>
-                                    <textarea
-                                        value={formData.description_ar}
-                                        onChange={(e) => setFormData({ ...formData, description_ar: e.target.value })}
-                                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                        rows={3}
-                                        dir="rtl"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                                        {t('plans.price')}
-                                    </label>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        value={formData.price}
-                                        onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                        required
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                                        {t('plans.interval')}
-                                    </label>
-                                    <select
-                                        value={formData.interval}
-                                        onChange={(e) => setFormData({ ...formData, interval: e.target.value })}
-                                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                    >
-                                        <option value="monthly">{t('plans.monthly')}</option>
-                                        <option value="yearly">{t('plans.yearly')}</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                                        {t('plans.requestLimit')}
-                                    </label>
-                                    <input
-                                        type="number"
-                                        value={formData.request_limit}
-                                        onChange={(e) => setFormData({ ...formData, request_limit: e.target.value })}
-                                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                        required
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <div className="flex items-center justify-between mb-4">
-                                    <label className="block text-sm font-bold text-gray-700">
-                                        {t('plans.features')}
-                                    </label>
-                                    <button
-                                        type="button"
-                                        onClick={addFeature}
-                                        className="text-sm text-purple-600 hover:text-purple-700 font-bold"
-                                    >
-                                        {t('plans.addFeature')}
-                                    </button>
-                                </div>
-                                {formData.features.map((feature, index) => (
-                                    <div key={index} className="flex gap-2 mb-2">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                                            {t('plans.nameEn')}
+                                        </label>
                                         <input
                                             type="text"
-                                            value={feature}
-                                            onChange={(e) => handleFeatureChange(index, e.target.value)}
-                                            placeholder={t('plans.featurePlaceholder')}
-                                            className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                            value={formData.name}
+                                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                            required
                                         />
-                                        {formData.features.length > 1 && (
-                                            <button
-                                                type="button"
-                                                onClick={() => removeFeature(index)}
-                                                className="px-4 py-3 text-red-600 hover:bg-red-50 rounded-xl transition-colors"
-                                            >
-                                                <X size={20} />
-                                            </button>
-                                        )}
                                     </div>
-                                ))}
-                            </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                                            {t('plans.nameAr')}
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={formData.name_ar}
+                                            onChange={(e) => setFormData({ ...formData, name_ar: e.target.value })}
+                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                            dir="rtl"
+                                        />
+                                    </div>
+                                </div>
 
-                            <div className="flex justify-end gap-3">
-                                <button
-                                    type="button"
-                                    onClick={closeModal}
-                                    className="px-6 py-3 border border-gray-200 rounded-xl font-bold text-gray-700 hover:bg-gray-50 transition-colors"
-                                >
-                                    {t('plans.cancel')}
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="flex items-center gap-2 px-6 py-3 bg-[#7C3AED] text-white rounded-xl font-bold hover:bg-purple-700 transition-colors"
-                                >
-                                    <Save size={18} />
-                                    {editingPlan ? (t('plans.update') || 'Update') : (t('plans.save') || 'Save')}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                                            {t('plans.descriptionEn')}
+                                        </label>
+                                        <textarea
+                                            value={formData.description}
+                                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                            rows={3}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                                            {t('plans.descriptionAr')}
+                                        </label>
+                                        <textarea
+                                            value={formData.description_ar}
+                                            onChange={(e) => setFormData({ ...formData, description_ar: e.target.value })}
+                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                            rows={3}
+                                            dir="rtl"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                                            {t('plans.price')}
+                                        </label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            value={formData.price}
+                                            onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                                            {t('plans.interval')}
+                                        </label>
+                                        <select
+                                            value={formData.billing_cycle}
+                                            onChange={(e) => setFormData({ ...formData, billing_cycle: e.target.value })}
+                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                        >
+                                            <option value="monthly">{t('plans.monthly')}</option>
+                                            <option value="yearly">{t('plans.yearly')}</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                                            {t('plans.requestLimit')}
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={formData.request_limit}
+                                            onChange={(e) => setFormData({ ...formData, request_limit: e.target.value })}
+                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <label className="block text-sm font-bold text-gray-700">
+                                            {t('plans.features')}
+                                        </label>
+                                        <button
+                                            type="button"
+                                            onClick={addFeature}
+                                            className="text-sm text-purple-600 hover:text-purple-700 font-bold"
+                                        >
+                                            {t('plans.addFeature')}
+                                        </button>
+                                    </div>
+                                    {formData.features.map((feature, index) => (
+                                        <div key={index} className="flex gap-2 mb-2">
+                                            <input
+                                                type="text"
+                                                value={feature}
+                                                onChange={(e) => handleFeatureChange(index, e.target.value)}
+                                                placeholder={t('plans.featurePlaceholder')}
+                                                className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                            />
+                                            {formData.features.length > 1 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeFeature(index)}
+                                                    className="px-4 py-3 text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                                                >
+                                                    <X size={20} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="flex justify-end gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={closeModal}
+                                        className="px-6 py-3 border border-gray-200 rounded-xl font-bold text-gray-700 hover:bg-gray-50 transition-colors"
+                                    >
+                                        {t('plans.cancel')}
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="flex items-center gap-2 px-6 py-3 bg-[#7C3AED] text-white rounded-xl font-bold hover:bg-purple-700 transition-colors"
+                                    >
+                                        <Save size={18} />
+                                        {editingPlan ? (t('plans.update') || 'Update') : (t('plans.save') || 'Save')}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
                 )}
 
@@ -369,16 +369,16 @@ export default function PlansDashboard() {
                                     </button>
                                 </div>
                                 <h3 className="text-xl font-bold text-gray-900 mb-2">
-                                    {isRTL ? plan.name_ar : plan.name}
+                                    {isRTL ? (plan.name_ar || plan.display_name || plan.name) : plan.name}
                                 </h3>
                                 <p className="text-3xl font-black text-[#7C3AED] mb-4">
                                     ${plan.price}
                                     <span className="text-sm font-normal text-gray-500">
-                                        /{plan.interval === 'monthly' ? t('plans.month') || 'month' : t('plans.year') || 'year'}
+                                        /{plan.billing_cycle === 'monthly' ? t('plans.month') || 'month' : t('plans.year') || 'year'}
                                     </span>
                                 </p>
                                 <p className="text-gray-600 text-sm mb-4">
-                                    {isRTL ? plan.description_ar : plan.description}
+                                    {isRTL ? (plan.description_ar || plan.description) : plan.description}
                                 </p>
                                 <div className="space-y-2">
                                     {(Array.isArray(plan.features) ? plan.features : []).map((feature, index) => (
@@ -388,6 +388,9 @@ export default function PlansDashboard() {
                                         </div>
                                     ))}
                                 </div>
+                                <p className="text-xs text-gray-400 mt-3">
+                                    {plan.billing_cycle === 'yearly' ? t('plans.year') || 'year' : t('plans.month') || 'month'}
+                                </p>
                             </div>
                         ))}
                     </div>

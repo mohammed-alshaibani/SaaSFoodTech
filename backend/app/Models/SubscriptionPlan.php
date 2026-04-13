@@ -13,7 +13,9 @@ class SubscriptionPlan extends Model
     protected $fillable = [
         'name',
         'display_name',
+        'name_ar',
         'description',
+        'description_ar',
         'price',
         'billing_cycle',
         'features',

@@ -25,6 +25,7 @@ export default function ProviderDashboard() {
     const [requests, setRequests] = useState([]);
     const [filteredRequests, setFilteredRequests] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [stats, setStats] = useState(null);
     const [radius, setRadius] = useState(20);
     const [coords, setCoords] = useState(null);
     const [geoError, setGeoError] = useState('');
@@ -80,7 +81,19 @@ export default function ProviderDashboard() {
         }
     }, [tab, coords, radius, showMessage]);
 
-    useEffect(() => { fetchRequests(); }, [fetchRequests]);
+    const fetchStats = useCallback(async () => {
+        try {
+            const res = await api.get('/provider/stats');
+            setStats(res.data.data || null);
+        } catch (err) {
+            console.error('Failed to fetch stats:', err);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchRequests();
+        fetchStats();
+    }, [fetchRequests, fetchStats]);
 
     useEffect(() => {
         let filtered = [...requests];
@@ -125,10 +138,17 @@ export default function ProviderDashboard() {
     const handleAccept = async (id) => {
         setAccepting(id);
         try {
-            await api.patch(`/requests/${id}/accept`);
-            showMessage('Accepted successfully!', 'success');
-            fetchRequests(true);
+            const res = await api.patch(`/requests/${id}/accept`);
+            const updatedReq = res.data.data;
+
+            // Optimistic update for immediate feedback
+            setRequests(prev => prev.map(r => r.id === id ? { ...r, ...updatedReq } : r));
+
+            showMessage(t('dashboard.acceptedSuccessfully') || 'Accepted successfully!', 'success');
+            fetchRequests(true); // Background sync
+            fetchStats();        // Refresh stats
         } catch (err) {
+            fetchStats();        // Refresh stats
             showMessage(err.response?.data?.message || 'Error', 'error');
         } finally {
             setAccepting(null);
@@ -138,9 +158,15 @@ export default function ProviderDashboard() {
     const handleComplete = async (id) => {
         setCompleting(id);
         try {
-            await api.patch(`/requests/${id}/complete`);
-            showMessage('Order Completed!', 'success');
-            fetchRequests(true);
+            const res = await api.patch(`/requests/${id}/complete`);
+            const updatedReq = res.data.data;
+
+            // Optimistic update for immediate feedback
+            setRequests(prev => prev.map(r => r.id === id ? { ...r, ...updatedReq } : r));
+
+            showMessage(t('dashboard.completedSuccessfully') || 'Order Completed!', 'success');
+            fetchRequests(true); // Background sync
+            fetchStats();        // Refresh stats
         } catch {
             showMessage('Completion failed', 'error');
         } finally {
@@ -154,10 +180,30 @@ export default function ProviderDashboard() {
                 <ProviderHeader
                     title={t('dashboard.providerTitle') || 'Provider Dashboard'}
                     description={t('dashboard.description') || 'Manage and track your service requests.'}
-                    onSync={() => fetchRequests()}
+                    onSync={() => { fetchRequests(); fetchStats(); }}
                     isSyncing={loading}
                     t={t}
                 />
+
+                {/* Stats Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">{t('dashboard.totalCustomers') || 'Total Customers'}</p>
+                        <p className="text-3xl font-black text-gray-900">{stats?.total_customers || 0}</p>
+                    </div>
+                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">{t('dashboard.activeSubscriptions') || 'Active Subscriptions'}</p>
+                        <p className="text-3xl font-black text-emerald-600">{stats?.active_subscriptions || 0}</p>
+                    </div>
+                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">{t('dashboard.pendingSubscriptions') || 'Pending Approvals'}</p>
+                        <p className="text-3xl font-black text-amber-500">{stats?.pending_subscriptions || 0}</p>
+                    </div>
+                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">{t('dashboard.monthlyRevenue') || 'Monthly Revenue'}</p>
+                        <p className="text-3xl font-black text-primary">${stats?.monthly_revenue || 0}</p>
+                    </div>
+                </div>
 
                 <div className="flex flex-col md:flex-row items-center gap-6">
                     <div className="flex gap-1 p-1.5 bg-gray-100 border border-gray-200 rounded-xl">

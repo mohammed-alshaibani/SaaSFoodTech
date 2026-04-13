@@ -10,7 +10,8 @@ class ServiceRequestDTO
         public readonly float $latitude,
         public readonly float $longitude,
         public readonly ?string $category = null,
-        public readonly array $attachments = []
+        public readonly array $attachments = [],
+        public readonly ?int $provider_id = null
     ) {
     }
 
@@ -25,7 +26,8 @@ class ServiceRequestDTO
             latitude: (float) $data['latitude'],
             longitude: (float) $data['longitude'],
             category: $data['category'] ?? null,
-            attachments: $data['attachments'] ?? []
+            attachments: $data['attachments'] ?? [],
+            provider_id: isset($data['provider_id']) ? (int) $data['provider_id'] : null
         );
     }
 }

@@ -11,11 +11,11 @@ class Attachment extends Model
 
     protected $fillable = [
         'service_request_id',
-        'filename',
-        'original_filename',
+        'uploaded_by',
+        'file_path',
         'file_type',
         'file_size',
-        'path',
+        'original_name',
     ];
 
     public function serviceRequest()

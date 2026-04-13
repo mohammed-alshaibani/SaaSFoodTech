@@ -31,6 +31,9 @@ class UpdateServiceRequestRequest extends FormRequest
                     'status' => 'sometimes|string|in:pending,accepted,work_done,completed,cancelled',
                     'category' => 'sometimes|string',
                     'urgency' => 'sometimes|string|in:low,medium,high,critical',
+                    'latitude' => 'sometimes|nullable|numeric|between:-90,90',
+                    'longitude' => 'sometimes|nullable|numeric|between:-180,180',
+                    'provider_id' => 'sometimes|nullable|exists:users,id',
                 ];
             }
         }

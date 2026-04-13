@@ -33,31 +33,8 @@ export default function ProviderLayout({ children }) {
     const roleLabel = primaryRole === 'provider_admin' ? 'Provider Admin' : 'Provider';
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            <nav className="bg-white shadow-sm border-b">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between h-16 items-center">
-                        <div className="flex items-center gap-3">
-                            <span className="text-xl font-bold text-green-600">Provider Portal</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-semibold">
-                                {roleLabel}
-                            </span>
-                            <span className="text-sm text-gray-700 font-medium">{user.name}</span>
-                            <button
-                                onClick={logout}
-                                className="text-sm text-red-500 hover:text-red-700 transition"
-                            >
-                                Sign out
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </nav>
-            <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-                {children}
-            </main>
+        <div className="min-h-screen bg-transparent">
+            {children}
         </div>
     );
 }
