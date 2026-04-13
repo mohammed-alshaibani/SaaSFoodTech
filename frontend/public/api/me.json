@@ -10,6 +10,7 @@
             "request.view",
             "request.accept",
             "request.complete"
-        ]
+        ],
+        "password": "password"
     }
 }

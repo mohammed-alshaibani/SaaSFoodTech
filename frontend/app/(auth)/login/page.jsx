@@ -34,8 +34,8 @@ export default function LoginPage() {
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-600">
             {t('auth.dontHaveAccount')}{' '}
-            <Link 
-              href="/register" 
+            <Link
+              href="/register"
               className="text-blue-600 hover:text-blue-500 font-medium"
             >
               {t('auth.signUp')}
@@ -50,6 +50,7 @@ export default function LoginPage() {
           </summary>
           <div className="mt-2 space-y-1 font-mono text-center">
             <div>admin@test.com / password</div>
+            <div>provider@test.com / password</div>
             <div>customer@test.com / password</div>
           </div>
         </details>

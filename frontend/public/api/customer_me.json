@@ -9,6 +9,7 @@
         "permissions": [
             "request.view",
             "request.create"
-        ]
+        ],
+        "password": "password"
     }
 }

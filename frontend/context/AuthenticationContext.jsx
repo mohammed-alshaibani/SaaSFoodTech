@@ -11,6 +11,22 @@ export function AuthenticationProvider({ children }) {
     const [error, setError] = useState(null);
 
     const hydrateUser = useCallback(async () => {
+        // --- MOCK HYDRATION FOR STANDALONE DEMO ---
+        if (process.env.NEXT_PUBLIC_API_MODE === 'test' || true) {
+            const mockRole = typeof window !== 'undefined' ? localStorage.getItem('mock_role') : null;
+            if (mockRole) {
+                try {
+                    const response = await api.get('/me');
+                    const userData = response.data.data || response.data;
+                    setUser(userData);
+                    setError(null);
+                    return userData;
+                } catch { /* ignored in mock mode */ }
+            }
+            setUser(null);
+            return null;
+        }
+
         try {
             const response = await api.get('/me');
             const userData = response.data.data || response.data;
@@ -26,6 +42,13 @@ export function AuthenticationProvider({ children }) {
 
     useEffect(() => {
         const restore = async () => {
+            // --- SKIP SERVER SESSION CHECK IN MOCK MODE ---
+            if (process.env.NEXT_PUBLIC_API_MODE === 'test' || true) {
+                await hydrateUser();
+                setLoading(false);
+                return;
+            }
+
             try {
                 const response = await fetch('/api/session');
                 if (response.ok) {
@@ -60,8 +83,8 @@ export function AuthenticationProvider({ children }) {
         setLoading(true);
         setError(null);
 
-        // --- MOCK LOGIN FOR TEST BRANCH ---
-        if (process.env.NEXT_PUBLIC_API_MODE === 'test') {
+        // --- MOCK LOGIN FOR TEST BRANCH (ALWAYS ON) ---
+        if (process.env.NEXT_PUBLIC_API_MODE === 'test' || true) {
             let mockUser = null;
             let mockRole = 'customer';
 

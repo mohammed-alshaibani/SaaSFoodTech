@@ -1,7 +1,8 @@
 import axios from 'axios';
 
 // Debug: Log API URL configuration (only in development)
-const isMockMode = process.env.NEXT_PUBLIC_API_MODE === 'test';
+// Force Mock Mode for standalone demo in test branch
+const isMockMode = process.env.NEXT_PUBLIC_API_MODE === 'test' || true;
 const API_BASE_URL = isMockMode ? '/' : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api');
 
 if (process.env.NODE_ENV === 'development') {
