@@ -48,18 +48,21 @@ COPY nginx.conf /etc/nginx/sites-available/default
 # Copy supervisor configuration (as root, before USER switch)
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-# Copy PHP-FPM global configuration (overrides error_log to stderr)
+# Copy PHP-FPM global configuration
 COPY php-fpm.conf /usr/local/etc/php-fpm.conf
+
+# Copy PHP-FPM pool configuration to ensure it listens on 9000
+COPY fpm-www.conf /usr/local/etc/php-fpm.d/www.conf
 
 # Run composer install
 RUN composer install --optimize-autoloader --no-dev
 
 # Fix ownership and permissions so www user can write to storage and cache
 RUN mkdir -p /var/www/html/storage/logs \
-             /var/www/html/storage/framework/cache \
-             /var/www/html/storage/framework/sessions \
-             /var/www/html/storage/framework/views \
-             /var/www/html/bootstrap/cache && \
+    /var/www/html/storage/framework/cache \
+    /var/www/html/storage/framework/sessions \
+    /var/www/html/storage/framework/views \
+    /var/www/html/bootstrap/cache && \
     chown -R www:www /var/www/html && \
     chmod -R 755 /var/www/html && \
     chmod -R 775 /var/www/html/storage && \
