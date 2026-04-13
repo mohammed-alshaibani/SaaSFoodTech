@@ -3,7 +3,7 @@
     "data": {
         "id": 99,
         "name": "المدير العام - استقرار الجودة",
-        "email": "admin@quality.sa",
+        "email": "admin@test.com",
         "role": "admin",
         "permissions": [
             "all"

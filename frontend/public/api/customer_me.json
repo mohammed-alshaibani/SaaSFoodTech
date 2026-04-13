@@ -3,7 +3,7 @@
     "data": {
         "id": 10,
         "name": "مطعم النبلاء للأغذية",
-        "email": "nobles@restaurant.sa",
+        "email": "customer@test.com",
         "role": "customer",
         "plan": "premium",
         "permissions": [

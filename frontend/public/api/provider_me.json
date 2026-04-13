@@ -3,7 +3,7 @@
     "data": {
         "id": 50,
         "name": "مختبر نجد لسلامة الأغذية",
-        "email": "lab@najd.sa",
+        "email": "provider@test.com",
         "role": "provider_admin",
         "company": "شركة استقرار الجودة",
         "permissions": [

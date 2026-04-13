@@ -65,13 +65,13 @@ export function AuthenticationProvider({ children }) {
             let mockUser = null;
             let mockRole = 'customer';
 
-            if (credentials.email === 'admin@quality.sa') {
+            if (credentials.email === 'admin@test.com') {
                 mockRole = 'admin';
                 mockUser = { id: 99, name: 'المدير العام', email: credentials.email, roles: ['admin'] };
-            } else if (credentials.email === 'lab@najd.sa') {
+            } else if (credentials.email === 'provider@test.com') {
                 mockRole = 'provider_admin';
                 mockUser = { id: 50, name: 'مختبر نجد', email: credentials.email, roles: ['provider_admin'] };
-            } else if (credentials.email === 'nobles@restaurant.sa') {
+            } else if (credentials.email === 'customer@test.com') {
                 mockRole = 'customer';
                 mockUser = { id: 10, name: 'مطعم النبلاء', email: credentials.email, roles: ['customer'] };
             }
