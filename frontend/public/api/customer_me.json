@@ -1,0 +1,14 @@
+{
+    "success": true,
+    "data": {
+        "id": 10,
+        "name": "مطعم النبلاء للأغذية",
+        "email": "nobles@restaurant.sa",
+        "role": "customer",
+        "plan": "premium",
+        "permissions": [
+            "request.view",
+            "request.create"
+        ]
+    }
+}

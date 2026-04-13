@@ -1,9 +1,11 @@
 import axios from 'axios';
 
 // Debug: Log API URL configuration (only in development)
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+const isMockMode = process.env.NEXT_PUBLIC_API_MODE === 'test';
+const API_BASE_URL = isMockMode ? '/' : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api');
+
 if (process.env.NODE_ENV === 'development') {
-    console.log('[API] Base URL:', API_BASE_URL);
+    console.log(`[API] Base URL: ${API_BASE_URL} ${isMockMode ? '(MOCK MODE)' : ''}`);
 }
 
 const api = axios.create({
@@ -16,8 +18,30 @@ const api = axios.create({
         'Pragma': 'no-cache',
         'Expires': '0',
     },
-    timeout: 30000, // 30 second timeout
+    timeout: 30000,
 });
+
+/**
+ * Handle Mock Routing for Test Branch
+ */
+if (isMockMode) {
+    api.interceptors.request.use((config) => {
+        const cleanPath = config.url.startsWith('/') ? config.url : `/${config.url}`;
+
+        // Dynamic /me based on mock login
+        if (cleanPath === '/me') {
+            const mockRole = typeof window !== 'undefined' ? localStorage.getItem('mock_role') : null;
+            const roleFile = mockRole ? `${mockRole}_me.json` : 'me.json';
+            config.url = `/api/${roleFile}`;
+        } else {
+            config.url = `/api${cleanPath}.json`;
+        }
+
+        config.method = 'GET';
+        console.log(`[Mock API] Intercepted: ${cleanPath} -> ${config.url}`);
+        return config;
+    });
+}
 
 // ─── Token cache ─────────────────────────────────────────────────────────────
 // We keep an in-memory token reference to avoid a round-trip to /api/session

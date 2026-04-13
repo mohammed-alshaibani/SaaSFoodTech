@@ -60,6 +60,44 @@ export function AuthenticationProvider({ children }) {
         setLoading(true);
         setError(null);
 
+        // --- MOCK LOGIN FOR TEST BRANCH ---
+        if (process.env.NEXT_PUBLIC_API_MODE === 'test') {
+            let mockUser = null;
+            let mockRole = 'customer';
+
+            if (credentials.email === 'admin@quality.sa') {
+                mockRole = 'admin';
+                mockUser = { id: 99, name: 'المدير العام', email: credentials.email, roles: ['admin'] };
+            } else if (credentials.email === 'lab@najd.sa') {
+                mockRole = 'provider_admin';
+                mockUser = { id: 50, name: 'مختبر نجد', email: credentials.email, roles: ['provider_admin'] };
+            } else if (credentials.email === 'nobles@restaurant.sa') {
+                mockRole = 'customer';
+                mockUser = { id: 10, name: 'مطعم النبلاء', email: credentials.email, roles: ['customer'] };
+            }
+
+            if (mockUser) {
+                if (typeof window !== 'undefined') {
+                    localStorage.setItem('mock_role', mockRole);
+                }
+
+                // Simulate session creation
+                await fetch('/api/session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: 'mock-token', role: mockRole }),
+                });
+
+                setUser(mockUser);
+                setLoading(false);
+                return { success: true, user: mockUser };
+            }
+            // Fallback if fake email doesn't match
+            setError('Invalid mock credentials (Try: admin@quality.sa)');
+            setLoading(false);
+            return { success: false, error: 'Invalid mock credentials' };
+        }
+
         try {
             const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
             const response = await fetch(`${baseUrl}/login`, {
@@ -159,6 +197,9 @@ export function AuthenticationProvider({ children }) {
         } finally {
             await fetch('/api/session', { method: 'DELETE' });
             clearTokenCache();
+            if (typeof window !== 'undefined') {
+                localStorage.removeItem('mock_role');
+            }
             setUser(null);
             setError(null);
             setLoading(false);

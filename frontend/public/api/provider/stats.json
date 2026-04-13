@@ -1,0 +1,10 @@
+{
+    "success": true,
+    "data": {
+        "total_requests": 15,
+        "pending_requests": 2,
+        "active_requests": 3,
+        "completed_requests": 10,
+        "total_customers": 8
+    }
+}

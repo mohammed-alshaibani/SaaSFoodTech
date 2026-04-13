@@ -1,0 +1,15 @@
+{
+    "success": true,
+    "data": {
+        "id": 50,
+        "name": "مختبر نجد لسلامة الأغذية",
+        "email": "lab@najd.sa",
+        "role": "provider_admin",
+        "company": "شركة استقرار الجودة",
+        "permissions": [
+            "request.view",
+            "request.accept",
+            "request.complete"
+        ]
+    }
+}
