@@ -1,0 +1,9 @@
+{
+    "success": true,
+    "data": {
+        "requests_used": 12,
+        "requests_limit": 100,
+        "percentage": 12,
+        "plan_name": "الخطة الاحترافية"
+    }
+}
