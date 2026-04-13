@@ -48,9 +48,6 @@ COPY nginx.conf /etc/nginx/sites-available/default
 # Copy supervisor configuration (as root, before USER switch)
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-# Change current user to www
-USER www
-
 # Expose port 9000 (PHP-FPM) and 8080 (Nginx HTTP)
 EXPOSE 9000 8080
 
