@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y \
     libgd-dev \
     jpegoptim optipng pngquant gifsicle \
     vim \
+    nginx \
     supervisor \
     cron \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
@@ -38,20 +39,23 @@ RUN useradd -u 1000 -ms /bin/bash -g www www
 # Copy existing application directory permissions
 COPY --chown=www:www . /var/www/html
 
+# Copy PHP configuration (as root, before USER switch)
+COPY php.ini /usr/local/etc/php/conf.d/custom.ini
+
+# Copy Nginx configuration (as root, before USER switch)
+COPY nginx.conf /etc/nginx/sites-available/default
+
+# Copy supervisor configuration (as root, before USER switch)
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
 # Change current user to www
 USER www
 
-# Expose port 9000 and start php-fpm server
-EXPOSE 9000
+# Expose port 9000 (PHP-FPM) and 8080 (Nginx HTTP)
+EXPOSE 9000 8080
 
 # Run composer install
 RUN composer install --optimize-autoloader
-
-# Copy PHP configuration
-COPY php.ini /usr/local/etc/php/conf.d/custom.ini
-
-# Copy supervisor configuration
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Set up cron job for Laravel scheduler
 RUN crontab -l | { cat; echo "* * * * * cd /var/www/html && php artisan schedule:run >> /dev/null 2>&1"; } | crontab -
