@@ -7,16 +7,24 @@ import Pricing from '@/components/landing/Pricing';
 import FAQ from '@/components/landing/FAQ';
 import Footer from '@/components/landing/Footer';
 
-export const metadata = {
-    title: 'ServiceHub | Standardized SaaS for FoodTech',
-    description: 'The ultimate platform for service providers and customers in the FoodTech industry. Manage requests, subscriptions, and scale your business.',
-    keywords: ['foodtech', 'saas', 'service provider', 'customer management', 'platform'],
-    openGraph: {
-        title: 'ServiceHub | FoodTech SaaS',
-        description: 'Connect with providers and customers seamlessly.',
-        type: 'website',
+async function getTranslations(locale) {
+    try {
+        const translations = await import(`../../public/locales/${locale}/common.json`);
+        return translations.default;
+    } catch (e) {
+        return {};
     }
-};
+}
+
+export async function generateMetadata({ params }) {
+    const { locale } = params;
+    const t = await getTranslations(locale);
+    return {
+        title: t.hero?.title || 'ServiceHub | FoodTech SaaS',
+        description: t.hero?.description || 'Connect with providers and customers seamlessly.',
+        keywords: ['foodtech', 'saas', 'service provider', 'customer management', 'platform'],
+    };
+}
 
 export default function LandingPage() {
     // This is now a Server Component. It renders the skeleton of the landing page.

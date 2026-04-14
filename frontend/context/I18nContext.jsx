@@ -2,34 +2,25 @@
 
 import { createContext, useContext, useState, useEffect } from 'react';
 
-// Translations are now loaded dynamically from /public/locales/[locale]/common.json
+const i18nConfig = {
+  useSuspense: true,
+  fallbackLng: 'ar',
+};
 
-// Context
 const I18nContext = createContext(undefined);
 
-// Provider
-/**
- * I18nContext
- * 
- * ARCHITECTURAL NOTE: Kept for RTL support and future-readiness for the Arab market.
- * Provides lightweight translation strings and direction switching.
- */
-export function I18nProvider({ children }) {
-  const [locale, setLocale] = useState('ar'); // Default to Arabic
-  const [translations, setTranslations] = useState({});
-  const [loading, setLoading] = useState(true);
+export function I18nProvider({ children, initialLocale = 'ar', initialTranslations = {} }) {
+  const [locale, setLocale] = useState(initialLocale);
+  const [translations, setTranslations] = useState(initialTranslations);
+  const [loading, setLoading] = useState(Object.keys(initialTranslations).length === 0);
 
-  // Load saved locale from localStorage on mount
-  useEffect(() => {
-    const savedLocale = localStorage.getItem('locale');
-    if (savedLocale && (savedLocale === 'ar' || savedLocale === 'en')) {
-      setLocale(savedLocale);
-    }
-  }, []);
-
-  // Fetch translations when locale changes
   useEffect(() => {
     async function loadTranslations() {
+      if (Object.keys(translations).length > 0 && locale === initialLocale) {
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       try {
         const response = await fetch(`/locales/${locale}/common.json`);
@@ -41,17 +32,18 @@ export function I18nProvider({ children }) {
         setLoading(false);
       }
     }
-    
+
     loadTranslations();
-    
-    localStorage.setItem('locale', locale);
+
+    document.cookie = `NEXT_LOCALE=${locale}; path=/; max-age=31536000`;
     document.documentElement.dir = locale === 'ar' ? 'rtl' : 'ltr';
     document.documentElement.lang = locale;
-  }, [locale]);
+  }, [locale, initialLocale]);
 
   const t = (key) => {
-    if (loading || !translations) return key;
-    
+    if (loading && i18nConfig.useSuspense) return '';
+    if (!translations || Object.keys(translations).length === 0) return key;
+
     const keys = key.split('.');
     let value = translations;
 
@@ -64,30 +56,23 @@ export function I18nProvider({ children }) {
 
   const changeLanguage = (newLocale) => {
     if (newLocale === 'ar' || newLocale === 'en') {
-      setLocale(newLocale);
+      const currentPath = window.location.pathname;
+      const newPath = currentPath.replace(/^\/(en|ar)/, `/${newLocale}`);
+      window.location.href = newPath;
     }
   };
 
-  const value = {
-    locale,
-    t,
-    changeLanguage,
-    isRTL: locale === 'ar',
-    loading
-  };
+  const value = { locale, t, changeLanguage, isRTL: locale === 'ar', loading };
 
   return (
     <I18nContext.Provider value={value}>
-      {children}
+      {i18nConfig.useSuspense && loading ? null : children}
     </I18nContext.Provider>
   );
 }
 
-// Hook
 export function useI18n() {
   const context = useContext(I18nContext);
-  if (context === undefined) {
-    throw new Error('useI18n must be used within an I18nProvider');
-  }
+  if (context === undefined) throw new Error('useI18n must be used within an I18nProvider');
   return context;
 }
