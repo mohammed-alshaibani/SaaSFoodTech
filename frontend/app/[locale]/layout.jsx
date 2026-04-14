@@ -37,12 +37,12 @@ export async function generateMetadata({ params }) {
 }
 
 export default async function RootLayout({ children, params }) {
-  const { locale } = params;
+  const locale = params?.locale || 'ar';
   const translations = await getTranslations(locale);
 
   return (
-    <html lang={locale} dir={locale === 'ar' ? 'rtl' : 'ltr'} className={`${inter.variable} ${ibmPlexArabic.variable} h-full antialiased h-screen overflow-x-hidden`}>
-      <body className="min-h-full flex flex-col bg-slate-50 text-slate-900 font-sans">
+    <html lang={locale} dir={locale === 'ar' ? 'rtl' : 'ltr'} className={`${inter.variable} ${ibmPlexArabic.variable} h-full antialiased`}>
+      <body className="min-h-full flex flex-col bg-slate-50 text-slate-900 font-sans overflow-x-hidden">
         <I18nProvider initialLocale={locale} initialTranslations={translations}>
           <AppProvider>
             <DynamicLayout>

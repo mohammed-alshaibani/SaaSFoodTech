@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
 import { useI18n } from '@/context/I18nContext';
 import DashboardLayout from '@/components/DashboardLayout';
+import RequestForm from '@/components/admin/RequestForm';
 import {
     FileText, RefreshCcw, Clock, CheckCircle2, XCircle,
     Search, Filter, User, MapPin, Calendar, Eye, Loader2, Trash2, Edit3, ChevronDown
@@ -318,111 +319,19 @@ export default function AdminRequestsDashboard() {
 
                 {/* Edit Form Modal */}
                 {selectedRequest && (
-                    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-navy/40 backdrop-blur-sm animate-in fade-in duration-200">
-                        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-                            {/* Modal Header */}
-                            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center">
-                                        <Edit3 size={20} />
-                                    </div>
-                                    <h2 className="text-xl font-black text-navy">
-                                        تعديل بيانات الطلب #{selectedRequest.id}
-                                    </h2>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={() => setSelectedRequest(null)}
-                                        className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                                    >
-                                        <XCircle size={24} className="text-gray-400" />
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Modal Body (Always Form) */}
-                            <div className="p-8 space-y-8 max-h-[70vh] overflow-y-auto custom-scrollbar">
-                                <div className="space-y-6">
-                                    <div className="space-y-1.5">
-                                        <label className="text-xs font-black text-gray-400 uppercase tracking-widest">موضوع الطلب</label>
-                                        <input
-                                            type="text"
-                                            value={editData.title}
-                                            onChange={(e) => setEditData({ ...editData, title: e.target.value })}
-                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl font-bold text-navy outline-none focus:border-primary focus:ring-1 focus:ring-primary shadow-inner"
-                                        />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-xs font-black text-gray-400 uppercase tracking-widest">وصف الطلب</label>
-                                        <textarea
-                                            value={editData.description}
-                                            onChange={(e) => setEditData({ ...editData, description: e.target.value })}
-                                            rows={5}
-                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-navy outline-none focus:border-primary focus:ring-1 focus:ring-primary leading-relaxed shadow-inner"
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-6">
-                                        <div className="space-y-1.5">
-                                            <label className="text-xs font-black text-gray-400 uppercase tracking-widest">الحالة</label>
-                                            <select
-                                                value={editData.status}
-                                                onChange={(e) => setEditData({ ...editData, status: e.target.value })}
-                                                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl font-bold text-navy outline-none focus:border-primary"
-                                            >
-                                                {Object.entries(STATUS_LABELS).map(([v, l]) => (
-                                                    <option key={v} value={v}>{l}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <label className="text-xs font-black text-gray-400 uppercase tracking-widest">بيانات العميل (عرض فقط)</label>
-                                            <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl text-gray-500 font-bold text-sm">
-                                                {selectedRequest.customer?.name}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                                        <div className="flex-1 space-y-1">
-                                            <p className="text-[10px] font-black text-gray-400 uppercase">إحداثيات الموقع</p>
-                                            <p className="font-mono text-sm text-navy">{editData.latitude}, {editData.longitude}</p>
-                                        </div>
-                                        <MapPin className="text-primary" size={24} />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Modal Footer */}
-                            <div className="p-6 border-t border-gray-100 bg-gray-50/50 flex justify-between items-center gap-3">
-                                <button
-                                    onClick={() => handleDeleteRequest(selectedRequest.id)}
-                                    disabled={!!actionLoading}
-                                    className="px-6 py-2.5 rounded-xl bg-red-50 text-red-600 font-bold hover:bg-red-100 transition-all flex items-center gap-2"
-                                >
-                                    <Trash2 size={18} />
-                                    حذف الطلب
-                                </button>
-
-                                <div className="flex gap-3">
-                                    <button
-                                        onClick={() => setSelectedRequest(null)}
-                                        disabled={!!actionLoading}
-                                        className="px-6 py-2.5 rounded-xl font-bold text-gray-500 hover:bg-white transition-all border border-gray-200"
-                                    >
-                                        إلغاء
-                                    </button>
-                                    <button
-                                        onClick={handleSaveUpdate}
-                                        disabled={!!actionLoading}
-                                        className="px-10 py-2.5 rounded-xl bg-primary text-white font-bold hover:bg-primary/90 transition-all flex items-center gap-2 shadow-lg shadow-primary/20"
-                                    >
-                                        {actionLoading === selectedRequest.id ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
-                                        حفظ البيانات
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <RequestForm
+                        request={selectedRequest}
+                        editData={editData}
+                        setEditData={setEditData}
+                        onSave={handleSaveUpdate}
+                        onDelete={handleDeleteRequest}
+                        onClose={() => setSelectedRequest(null)}
+                        loading={!!actionLoading}
+                        isRTL={true}
+                        STATUS_LABELS={STATUS_LABELS}
+                        isAdmin={true}
+                        mode="modal"
+                    />
                 )}
             </div>
         </DashboardLayout>
